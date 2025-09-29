@@ -1,37 +1,62 @@
 from rest_framework import serializers
-from .models import JobPosting, JobApplication
+from .models import Job, Application
+from accounts.serializers import UserSerializer
 
-class JobPostingSerializer(serializers.ModelSerializer):
-    created_by_username = serializers.CharField(source='created_by.username', read_only=True)
+class JobSerializer(serializers.ModelSerializer):
+    posted_by = UserSerializer(read_only=True)
+    application_count = serializers.SerializerMethodField()
     
     class Meta:
-        model = JobPosting
-        fields = [
-            'id', 'title', 'department', 'location', 'experience_level',
-            'description', 'requirements', 'salary_range', 'is_active',
-            'created_by_username', 'created_at', 'updated_at'
-        ]
+        model = Job
+        fields = ['id', 'title', 'description', 'requirements', 'job_type', 
+                  'location', 'salary_range', 'status', 'posted_by', 
+                  'created_at', 'updated_at', 'deadline', 'application_count']
+        read_only_fields = ['id', 'posted_by', 'created_at', 'updated_at']
+    
+    def get_application_count(self, obj):
+        return obj.applications.count()
 
-class JobApplicationSerializer(serializers.ModelSerializer):
-    job_title = serializers.CharField(source='job.title', read_only=True)
-    job_department = serializers.CharField(source='job.department', read_only=True)
+
+class JobCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Job
+        fields = ['title', 'description', 'requirements', 'job_type', 
+                  'location', 'salary_range', 'deadline']
+
+
+class ApplicationSerializer(serializers.ModelSerializer):
+    applicant = UserSerializer(read_only=True)
+    job = JobSerializer(read_only=True)
     
     class Meta:
-        model = JobApplication
-        fields = [
-            'id', 'job', 'job_title', 'job_department',
-            'full_name', 'email', 'phone', 'address',
-            'current_position', 'years_of_experience', 'expected_salary',
-            'resume', 'cover_letter', 'portfolio_url', 'linkedin_url',
-            'why_interested', 'availability', 'status', 'applied_at'
-        ]
-        read_only_fields = ['status', 'applied_at']
+        model = Application
+        fields = ['id', 'job', 'applicant', 'cover_letter', 'resume', 
+                  'pds', 'certificates', 'status', 'notes', 
+                  'applied_at', 'updated_at']
+        read_only_fields = ['id', 'applicant', 'applied_at', 'updated_at']
 
-# For public job listings (no sensitive info)
-class PublicJobSerializer(serializers.ModelSerializer):
+
+class ApplicationCreateSerializer(serializers.ModelSerializer):
     class Meta:
-        model = JobPosting
-        fields = [
-            'id', 'title', 'department', 'location', 'experience_level',
-            'description', 'requirements', 'salary_range', 'created_at'
-        ]
+        model = Application
+        fields = ['job', 'cover_letter', 'resume', 'pds', 'certificates']
+    
+    def validate(self, attrs):
+        request = self.context.get('request')
+        job = attrs.get('job')
+        
+        # Check if user already applied
+        if Application.objects.filter(job=job, applicant=request.user).exists():
+            raise serializers.ValidationError("You have already applied for this job.")
+        
+        # Check if job is open
+        if job.status != 'open':
+            raise serializers.ValidationError("This job is no longer accepting applications.")
+        
+        return attrs
+
+
+class ApplicationStatusUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Application
+        fields = ['status', 'notes']

@@ -1,133 +1,124 @@
-from django.contrib.auth.models import User
-from rest_framework import status
-from rest_framework.decorators import api_view
+from rest_framework import status, generics, permissions
 from rest_framework.response import Response
-from django.contrib.auth.hashers import make_password
-from django.contrib.auth import authenticate
-import re
+from rest_framework.views import APIView
+from rest_framework.authtoken.models import Token
+from django.contrib.auth import authenticate, get_user_model
+from .serializers import (
+    UserSerializer, 
+    ApplicantRegisterSerializer, 
+    HRCreateSerializer,
+    LoginSerializer
+)
 
-@api_view(['POST'])
-def register_hr(request):
-    """
-    Register HR user - account will be inactive until admin approval
-    """
-    try:
-        data = request.data
+User = get_user_model()
+
+
+class ApplicantRegisterView(generics.CreateAPIView):
+    """Applicants can self-register"""
+    queryset = User.objects.all()
+    serializer_class = ApplicantRegisterSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
         
-        # Validation
-        required_fields = ['username', 'email', 'password']
-        for field in required_fields:
-            if not data.get(field):
-                return Response({
-                    'error': f'{field.title()} is required'
-                }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Email validation
-        email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
-        if not re.match(email_pattern, data.get('email')):
-            return Response({
-                'error': 'Please enter a valid email address'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Check if user already exists
-        if User.objects.filter(email=data.get('email')).exists():
-            return Response({
-                'error': 'User with this email already exists'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        if User.objects.filter(username=data.get('username')).exists():
-            return Response({
-                'error': 'Username already taken'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Password validation
-        password = data.get('password')
-        if len(password) < 6:
-            return Response({
-                'error': 'Password must be at least 6 characters long'
-            }, status=status.HTTP_400_BAD_REQUEST)
-        
-        # Create inactive user
-        user = User.objects.create(
-            username=data.get('username'),
-            email=data.get('email'),
-            first_name=data.get('first_name', ''),
-            last_name=data.get('last_name', ''),
-            password=make_password(password),
-            is_active=False,  # User cannot login until admin activates
-            is_staff=False    # HR users are not staff by default
-        )
+        # Create token for the new user
+        token, created = Token.objects.get_or_create(user=user)
         
         return Response({
-            'success': True,
-            'message': 'Registration successful! Please wait for admin approval before you can log in.',
-            'user_id': user.id,
-            'username': user.username,
-            'email': user.email
+            'user': UserSerializer(user).data,
+            'token': token.key,
+            'message': 'Account created successfully'
         }, status=status.HTTP_201_CREATED)
-        
-    except Exception as e:
-        return Response({
-            'error': f'Registration failed: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-@api_view(['POST'])
-def login_hr(request):
-    """
-    Login for HR users - only works if account is active (approved by admin)
-    """
-    try:
-        username = request.data.get('username')
-        password = request.data.get('password')
+
+class HRCreateView(generics.CreateAPIView):
+    """Only admins can create HR accounts"""
+    queryset = User.objects.all()
+    serializer_class = HRCreateSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def create(self, request, *args, **kwargs):
+        # Check if user is admin
+        if request.user.user_type != 'admin':
+            return Response(
+                {'error': 'Only admins can create HR accounts'},
+                status=status.HTTP_403_FORBIDDEN
+            )
         
-        if not username or not password:
-            return Response({
-                'error': 'Username and password are required'
-            }, status=status.HTTP_400_BAD_REQUEST)
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+        
+        return Response({
+            'user': UserSerializer(user).data,
+            'message': 'HR account created successfully'
+        }, status=status.HTTP_201_CREATED)
+
+
+class LoginView(APIView):
+    """Login for all user types"""
+    permission_classes = [permissions.AllowAny]
+    
+    def post(self, request):
+        serializer = LoginSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        username = serializer.validated_data['username']
+        password = serializer.validated_data['password']
         
         user = authenticate(username=username, password=password)
         
         if user:
-            if user.is_active:
-                return Response({
-                    'success': True,
-                    'message': 'Login successful',
-                    'user': {
-                        'id': user.id,
-                        'username': user.username,
-                        'email': user.email,
-                        'first_name': user.first_name,
-                        'last_name': user.last_name,
-                        'is_staff': user.is_staff
-                    }
-                }, status=status.HTTP_200_OK)
-            else:
-                return Response({
-                    'error': 'Your account is pending admin approval. Please wait for activation.'
-                }, status=status.HTTP_403_FORBIDDEN)
-        else:
+            token, created = Token.objects.get_or_create(user=user)
             return Response({
-                'error': 'Invalid username or password'
-            }, status=status.HTTP_401_UNAUTHORIZED)
-            
-    except Exception as e:
-        return Response({
-            'error': f'Login failed: {str(e)}'
-        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'token': token.key,
+                'user': UserSerializer(user).data,
+                'message': 'Login successful'
+            }, status=status.HTTP_200_OK)
+        
+        return Response(
+            {'error': 'Invalid credentials'},
+            status=status.HTTP_401_UNAUTHORIZED
+        )
 
-@api_view(['GET'])
-def check_auth_status(request):
-    """
-    Check if user is authenticated (optional endpoint)
-    """
-    if request.user.is_authenticated:
-        return Response({
-            'authenticated': True,
-            'user': {
-                'id': request.user.id,
-                'username': request.user.username,
-                'email': request.user.email
-            }
-        })
-    else:
-        return Response({'authenticated': False})
+
+class LogoutView(APIView):
+    """Logout - delete token"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            request.user.auth_token.delete()
+            return Response(
+                {'message': 'Logout successful'},
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            return Response(
+                {'error': str(e)},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+
+class CurrentUserView(APIView):
+    """Get current logged in user details"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        serializer = UserSerializer(request.user)
+        return Response(serializer.data)
+
+
+class HRListView(generics.ListAPIView):
+    """List all HR staff - Only for admins"""
+    queryset = User.objects.filter(user_type='hr')
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        if self.request.user.user_type != 'admin':
+            return User.objects.none()
+        return super().get_queryset()

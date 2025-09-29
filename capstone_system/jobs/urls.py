@@ -1,38 +1,35 @@
 from django.urls import path
-from . import views
-from django.http import JsonResponse
-
-def api_root(request):
-    """API root endpoint that lists available endpoints"""
-    return JsonResponse({
-        'message': 'Jobs API',
-        'public_endpoints': {
-            'job_listings': '/api/public/jobs/',
-            'job_detail': '/api/public/jobs/{id}/',
-            'submit_application': '/api/public/apply/',
-        },
-        'protected_endpoints': {
-            'manage_jobs': '/api/jobs/',
-            'create_job': '/api/jobs/create/',
-            'applications': '/api/applications/',
-            'job_applications': '/api/jobs/{id}/applications/',
-            'update_status': '/api/applications/{id}/status/',
-        }
-    })
+from .views import (
+    JobListView,
+    JobDetailView,
+    JobCreateView,
+    JobUpdateView,
+    JobDeleteView,
+    HRJobListView,
+    ApplicationCreateView,
+    ApplicantApplicationListView,
+    JobApplicationListView,
+    ApplicationDetailView,
+    ApplicationStatusUpdateView
+)
 
 urlpatterns = [
-    # Root API endpoint
-    path('', api_root, name='api_root'),
+    # Public job endpoints
+    path('jobs/', JobListView.as_view(), name='job-list'),
+    path('jobs/<int:pk>/', JobDetailView.as_view(), name='job-detail'),
     
-    # Public endpoints (no auth required)
-    path('public/jobs/', views.public_job_listings, name='public_job_listings'),
-    path('public/jobs/<int:job_id>/', views.public_job_detail, name='public_job_detail'),
-    path('public/apply/', views.submit_application, name='submit_application'),
+    # HR job management
+    path('hr/jobs/', HRJobListView.as_view(), name='hr-job-list'),
+    path('hr/jobs/create/', JobCreateView.as_view(), name='job-create'),
+    path('hr/jobs/<int:pk>/update/', JobUpdateView.as_view(), name='job-update'),
+    path('hr/jobs/<int:pk>/delete/', JobDeleteView.as_view(), name='job-delete'),
     
-    # Protected endpoints (HR/Admin only)
-    path('jobs/', views.job_listings, name='job_listings'),
-    path('jobs/create/', views.create_job, name='create_job'),
-    path('applications/', views.job_applications, name='all_applications'),
-    path('jobs/<int:job_id>/applications/', views.job_applications, name='job_applications'),
-    path('applications/<int:application_id>/status/', views.update_application_status, name='update_application_status'),
+    # Application endpoints
+    path('applications/apply/', ApplicationCreateView.as_view(), name='application-create'),
+    path('applications/my-applications/', ApplicantApplicationListView.as_view(), name='my-applications'),
+    path('applications/<int:pk>/', ApplicationDetailView.as_view(), name='application-detail'),
+    
+    # HR application management
+    path('hr/jobs/<int:job_id>/applications/', JobApplicationListView.as_view(), name='job-applications'),
+    path('hr/applications/<int:pk>/update-status/', ApplicationStatusUpdateView.as_view(), name='application-update-status'),
 ]
