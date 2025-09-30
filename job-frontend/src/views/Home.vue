@@ -1,26 +1,20 @@
 <template>
   <div class="home-container">
-    <!-- Header Section -->
-    <header class="header">
+    <section class="hero-section">
       <div class="logo-section">
         <img src="@/assets/logo.png" alt="Company Logo" class="logo" />
-        <span class="company-name">COMPANY NAME</span>
+        <span class="company-name">About Butuan</span>
       </div>
-      <nav class="nav-links">
-        <a href="#about">ABOUT COMPANY</a>
-      </nav>
-    </header>
-
-    <!-- Hero Section with Background -->
-    <section class="hero-section">
       <div class="hero-overlay">
         <div class="hero-content">
           <div class="company-branding">
-            <img src="@/assets/company-logo.png" alt="Company Branding" class="brand-logo" />
-            <h1 class="tagline">A City Ascending!</h1>
+            <img
+              src="@/assets/company-logo.png"
+              alt="Company Branding"
+              class="brand-logo"
+            />
           </div>
 
-          <!-- Social Media Icons -->
           <div class="social-icons">
             <a href="#" class="social-icon instagram">
               <i class="fab fa-instagram"></i>
@@ -41,7 +35,7 @@
       <div class="access-container">
         <div class="access-box">
           <h2>CHOOSE YOUR ACCESS TYPE</h2>
-          
+
           <div class="access-buttons">
             <router-link to="/login" class="access-btn applicant-btn">
               <div class="btn-icon">
@@ -65,20 +59,31 @@
           </div>
 
           <div class="register-link">
-            <p>Don't have an account? <router-link to="/register">Register as Applicant</router-link></p>
+            <p>
+              Don't have an account?
+              <router-link to="/register">Register as Applicant</router-link>
+            </p>
           </div>
         </div>
 
         <!-- Quick Links Section -->
         <div class="quick-links">
           <h3>QUICK LINKS</h3>
-          
+
           <div class="link-cards">
-            <a href="https://jobstreet.com" target="_blank" class="link-card jobstreet">
+            <a
+              href="https://jobstreet.com"
+              target="_blank"
+              class="link-card jobstreet"
+            >
               <img src="@/assets/jobstreet-logo.png" alt="JobStreet" />
             </a>
 
-            <a href="https://outlook.com" target="_blank" class="link-card outlook">
+            <a
+              href="https://outlook.com"
+              target="_blank"
+              class="link-card outlook"
+            >
               <img src="@/assets/outlook-logo.png" alt="Outlook" />
             </a>
 
@@ -99,24 +104,24 @@
 
 <script>
 export default {
-  name: 'Home',
+  name: "Home",
   mounted() {
     // Check if user is already logged in
-    const token = localStorage.getItem('token')
-    const userType = localStorage.getItem('userType')
-    
+    const token = localStorage.getItem("token");
+    const userType = localStorage.getItem("userType");
+
     if (token && userType) {
       // Redirect based on user type
-      if (userType === 'admin') {
-        this.$router.push('/admin/dashboard')
-      } else if (userType === 'hr') {
-        this.$router.push('/hr/dashboard')
-      } else if (userType === 'applicant') {
-        this.$router.push('/applicant/dashboard')
+      if (userType === "admin") {
+        this.$router.push("/admin/dashboard");
+      } else if (userType === "hr") {
+        this.$router.push("/hr/dashboard");
+      } else if (userType === "applicant") {
+        this.$router.push("/applicant/dashboard");
       }
     }
-  }
-}
+  },
+};
 </script>
 
 <style scoped>
@@ -139,7 +144,7 @@ export default {
   align-items: center;
   padding: 15px 40px;
   background-color: white;
-  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   position: sticky;
   top: 0;
   z-index: 100;
@@ -152,10 +157,11 @@ export default {
 }
 
 .logo {
-  width: 50px;
+  width: 100px;
   height: 50px;
   border-radius: 50%;
   object-fit: cover;
+  padding: 10px;
 }
 
 .company-name {
@@ -173,7 +179,7 @@ export default {
 }
 
 .nav-links a:hover {
-  color: #4CAF50;
+  color: #4caf50;
 }
 
 /* Hero Section */
@@ -181,7 +187,7 @@ export default {
   position: relative;
   height: 400px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  background-image: url('https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200');
+  background-image: url("https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200");
   background-size: cover;
   background-position: center;
 }
@@ -192,7 +198,11 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, rgba(102, 126, 234, 0.8) 0%, rgba(118, 75, 162, 0.8) 100%);
+  background: linear-gradient(
+    135deg,
+    rgba(102, 126, 234, 0.8) 0%,
+    rgba(118, 75, 162, 0.8) 100%
+  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -219,7 +229,7 @@ export default {
 .tagline {
   font-size: 36px;
   font-weight: 700;
-  text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .social-icons {
@@ -247,7 +257,14 @@ export default {
 }
 
 .instagram {
-  background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
+  background: linear-gradient(
+    45deg,
+    #f09433 0%,
+    #e6683c 25%,
+    #dc2743 50%,
+    #cc2366 75%,
+    #bc1888 100%
+  );
 }
 
 .facebook {
@@ -278,7 +295,7 @@ export default {
   background: white;
   padding: 40px;
   border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 .access-box h2 {
@@ -329,7 +346,7 @@ export default {
 .btn-icon {
   width: 50px;
   height: 50px;
-  background: rgba(255,255,255,0.2);
+  background: rgba(255, 255, 255, 0.2);
   border-radius: 12px;
   display: flex;
   align-items: center;
@@ -362,7 +379,7 @@ export default {
 }
 
 .register-link a {
-  color: #4CAF50;
+  color: #4caf50;
   text-decoration: none;
   font-weight: 600;
 }
@@ -376,7 +393,7 @@ export default {
   background: white;
   padding: 30px;
   border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
 }
 
 .quick-links h3 {
@@ -405,7 +422,7 @@ export default {
 
 .link-card:hover {
   transform: translateX(5px);
-  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
 }
 
 .link-card img {
