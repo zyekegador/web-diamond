@@ -38,16 +38,9 @@ class HRCreateView(generics.CreateAPIView):
     """Only admins can create HR accounts"""
     queryset = User.objects.all()
     serializer_class = HRCreateSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
     
     def create(self, request, *args, **kwargs):
-        # Check if user is admin
-        if request.user.user_type != 'admin':
-            return Response(
-                {'error': 'Only admins can create HR accounts'},
-                status=status.HTTP_403_FORBIDDEN
-            )
-        
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -116,9 +109,4 @@ class HRListView(generics.ListAPIView):
     """List all HR staff - Only for admins"""
     queryset = User.objects.filter(user_type='hr')
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def get_queryset(self):
-        if self.request.user.user_type != 'admin':
-            return User.objects.none()
-        return super().get_queryset()
+    permission_classes = [permissions.IsAdminUser]
