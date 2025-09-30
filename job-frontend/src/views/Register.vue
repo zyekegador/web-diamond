@@ -1,30 +1,28 @@
 <template>
   <div class="register-container">
-    <div class="register-card">
-      <h2>HR Registration</h2>
+    <div class="register-box">
+      <h2>Applicant Registration</h2>
+      <form @submit.prevent="handleRegister">
+        <div class="form-row">
+          <div class="form-group">
+            <label>First Name *</label>
+            <input
+              type="text"
+              v-model="formData.first_name"
+              required
+              placeholder="Enter first name"
+            />
+          </div>
 
-      <!-- Success Message -->
-      <div v-if="registrationSuccess" class="success-message">
-        <div class="success-icon">✓</div>
-        <h3>Registration Successful!</h3>
-        <p>{{ successMessage }}</p>
-        <p class="note">An admin will review and activate your account soon.</p>
-        <div class="user-info">
-          <p><strong>Username:</strong> {{ registeredUser.username }}</p>
-          <p><strong>Email:</strong> {{ registeredUser.email }}</p>
-        </div>
-        <router-link to="/login" class="back-to-login">Go to Login</router-link>
-      </div>
-
-      <!-- Registration Form -->
-      <form
-        v-if="!registrationSuccess"
-        @submit.prevent="registerUser"
-        class="register-form"
-      >
-        <!-- Error Messages -->
-        <div v-if="errorMessage" class="error-message">
-          {{ errorMessage }}
+          <div class="form-group">
+            <label>Last Name *</label>
+            <input
+              type="text"
+              v-model="formData.last_name"
+              required
+              placeholder="Enter last name"
+            />
+          </div>
         </div>
 
         <div class="form-group">
@@ -33,8 +31,7 @@
             type="text"
             v-model="formData.username"
             required
-            placeholder="Enter username"
-            :disabled="isLoading"
+            placeholder="Choose a username"
           />
         </div>
 
@@ -45,152 +42,134 @@
             v-model="formData.email"
             required
             placeholder="Enter email"
-            :disabled="isLoading"
           />
+        </div>
+
+        <div class="form-group">
+          <label>Phone Number</label>
+          <input
+            type="tel"
+            v-model="formData.phone_number"
+            placeholder="Enter phone number"
+          />
+        </div>
+
+        <div class="form-group">
+          <label>Date of Birth</label>
+          <input type="date" v-model="formData.date_of_birth" />
+        </div>
+
+        <div class="form-group">
+          <label>Address</label>
+          <textarea
+            v-model="formData.address"
+            rows="3"
+            placeholder="Enter address"
+          ></textarea>
         </div>
 
         <div class="form-row">
           <div class="form-group">
-            <label>First Name</label>
+            <label>Password *</label>
             <input
-              type="text"
-              v-model="formData.first_name"
-              placeholder="First name"
-              :disabled="isLoading"
+              type="password"
+              v-model="formData.password"
+              required
+              placeholder="Enter password"
             />
           </div>
+
           <div class="form-group">
-            <label>Last Name</label>
+            <label>Confirm Password *</label>
             <input
-              type="text"
-              v-model="formData.last_name"
-              placeholder="Last name"
-              :disabled="isLoading"
+              type="password"
+              v-model="formData.password2"
+              required
+              placeholder="Confirm password"
             />
           </div>
         </div>
 
-        <div class="form-group">
-          <label>Password *</label>
-          <input
-            type="password"
-            v-model="formData.password"
-            required
-            placeholder="Enter password (min 6 characters)"
-            :disabled="isLoading"
-          />
+        <div v-if="error" class="error-message">
+          {{ error }}
         </div>
 
-        <div class="form-group">
-          <label>Confirm Password *</label>
-          <input
-            type="password"
-            v-model="formData.confirmPassword"
-            required
-            placeholder="Confirm password"
-            :disabled="isLoading"
-          />
+        <div v-if="success" class="success-message">
+          {{ success }}
         </div>
 
-        <button type="submit" :disabled="isLoading" class="register-btn">
-          <span v-if="isLoading">Registering...</span>
-          <span v-else>Register</span>
+        <button type="submit" class="btn-primary" :disabled="loading">
+          {{ loading ? "Creating Account..." : "Register" }}
         </button>
-
-        <p class="login-link">
-          Already have an account?
-          <router-link to="/login">Login here</router-link>
-        </p>
       </form>
+
+      <div class="login-link">
+        <p>
+          Already have an account? <router-link to="/login">Login</router-link>
+        </p>
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import axios from "axios";
+import api from "@/services/api";
 
 export default {
-  name: "Register",
+  name: "ApplicantRegister",
   data() {
     return {
       formData: {
         username: "",
         email: "",
+        password: "",
+        password2: "",
         first_name: "",
         last_name: "",
-        password: "",
-        confirmPassword: "",
+        phone_number: "",
+        address: "",
+        date_of_birth: "",
       },
-      isLoading: false,
-      errorMessage: "",
-      registrationSuccess: false,
-      successMessage: "",
-      registeredUser: {},
+      error: "",
+      success: "",
+      loading: false,
     };
   },
   methods: {
-    async registerUser() {
-      // Reset messages
-      this.errorMessage = "";
+    async handleRegister() {
+      this.loading = true;
+      this.error = "";
+      this.success = "";
 
-      // Validate passwords match
-      if (this.formData.password !== this.formData.confirmPassword) {
-        this.errorMessage = "Passwords do not match";
+      if (this.formData.password !== this.formData.password2) {
+        this.error = "Passwords do not match";
+        this.loading = false;
         return;
       }
-
-      // Validate password strength
-      if (this.formData.password.length < 6) {
-        this.errorMessage = "Password must be at least 6 characters long";
-        return;
-      }
-
-      this.isLoading = true;
 
       try {
-        const response = await axios.post(
-          "http://127.0.0.1:8000/api/auth/register/",
-          {
-            username: this.formData.username,
-            email: this.formData.email,
-            first_name: this.formData.first_name,
-            last_name: this.formData.last_name,
-            password: this.formData.password,
-          }
-        );
+        const response = await api.registerApplicant(this.formData);
+        this.success =
+          "Account created successfully! Redirecting to dashboard...";
 
-        if (response.data.success) {
-          this.registrationSuccess = true;
-          this.successMessage = response.data.message;
-          this.registeredUser = {
-            username: response.data.username,
-            email: response.data.email,
-          };
+        // Store token and user data
+        localStorage.setItem("token", response.data.token);
+        localStorage.setItem("user", JSON.stringify(response.data.user));
+        localStorage.setItem("userType", response.data.user.user_type);
 
-          // Clear form data
-          this.formData = {
-            username: "",
-            email: "",
-            first_name: "",
-            last_name: "",
-            password: "",
-            confirmPassword: "",
-          };
-        }
+        // Redirect to applicant dashboard
+        setTimeout(() => {
+          this.$router.push("/applicant/dashboard");
+        }, 1500);
       } catch (error) {
-        console.error("Registration error:", error);
-        if (
-          error.response &&
-          error.response.data &&
-          error.response.data.error
-        ) {
-          this.errorMessage = error.response.data.error;
+        if (error.response?.data) {
+          const errors = error.response.data;
+          this.error = Object.values(errors).flat().join(" ");
         } else {
-          this.errorMessage =
-            "Registration failed. Please check your connection and try again.";
+          this.error = "Registration failed. Please try again.";
         }
       } finally {
-        this.isLoading = false;
+        this.loading = false;
       }
     },
   },
@@ -203,175 +182,104 @@ export default {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   padding: 20px;
+  background-color: #f5f5f5;
 }
 
-.register-card {
+.register-box {
   background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  padding: 40px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   width: 100%;
-  max-width: 500px;
+  max-width: 600px;
 }
 
 h2 {
   text-align: center;
-  margin-bottom: 1.5rem;
+  margin-bottom: 30px;
   color: #333;
-  font-weight: 600;
-}
-
-.success-message {
-  text-align: center;
-  padding: 2rem;
-  border: 2px solid #4caf50;
-  border-radius: 8px;
-  background-color: #f8fff8;
-}
-
-.success-icon {
-  font-size: 4rem;
-  color: #4caf50;
-  margin-bottom: 1rem;
-  font-weight: bold;
-}
-
-.success-message h3 {
-  color: #4caf50;
-  margin-bottom: 1rem;
-  font-size: 1.5rem;
-}
-
-.success-message p {
-  margin-bottom: 0.5rem;
-  color: #666;
-  line-height: 1.5;
-}
-
-.note {
-  font-style: italic;
-  font-size: 0.9rem;
-  color: #888;
-}
-
-.user-info {
-  background-color: #f0f0f0;
-  padding: 1rem;
-  border-radius: 6px;
-  margin: 1rem 0;
-  text-align: left;
-}
-
-.user-info p {
-  margin: 0.25rem 0;
-  font-size: 0.9rem;
-}
-
-.back-to-login {
-  display: inline-block;
-  margin-top: 1rem;
-  padding: 12px 24px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  text-decoration: none;
-  border-radius: 6px;
-  transition: transform 0.2s, box-shadow 0.2s;
-  font-weight: 500;
-}
-
-.back-to-login:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
-}
-
-.register-form {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
 .form-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1rem;
+  gap: 15px;
 }
 
 .form-group {
-  display: flex;
-  flex-direction: column;
+  margin-bottom: 20px;
 }
 
-.form-group label {
-  margin-bottom: 0.5rem;
-  font-weight: 600;
-  color: #333;
-  font-size: 0.9rem;
+label {
+  display: block;
+  margin-bottom: 5px;
+  color: #555;
+  font-weight: 500;
 }
 
-.form-group input {
-  padding: 0.75rem;
-  border: 2px solid #e1e5e9;
-  border-radius: 6px;
-  font-size: 1rem;
-  transition: border-color 0.3s, box-shadow 0.3s;
+input,
+textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  font-family: inherit;
 }
 
-.form-group input:focus {
+input:focus,
+textarea:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #4caf50;
 }
 
-.form-group input:disabled {
-  background-color: #f8f9fa;
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  background-color: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.btn-primary:hover {
+  background-color: #45a049;
+}
+
+.btn-primary:disabled {
+  background-color: #ccc;
   cursor: not-allowed;
 }
 
 .error-message {
-  background-color: #ffe6e6;
-  color: #d63031;
-  padding: 0.75rem;
-  border-radius: 6px;
-  border: 1px solid #ffcccc;
+  color: #f44336;
+  padding: 10px;
+  background-color: #ffebee;
+  border-radius: 4px;
+  margin-bottom: 10px;
   text-align: center;
-  font-weight: 500;
 }
 
-.register-btn {
-  padding: 0.875rem;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: transform 0.2s, box-shadow 0.2s;
-  margin-top: 0.5rem;
-}
-
-.register-btn:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
-}
-
-.register-btn:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
+.success-message {
+  color: #4caf50;
+  padding: 10px;
+  background-color: #e8f5e9;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  text-align: center;
 }
 
 .login-link {
   text-align: center;
-  margin-top: 1.5rem;
-  color: #666;
+  margin-top: 20px;
 }
 
 .login-link a {
-  color: #667eea;
+  color: #4caf50;
   text-decoration: none;
   font-weight: 500;
 }
@@ -383,15 +291,6 @@ h2 {
 @media (max-width: 600px) {
   .form-row {
     grid-template-columns: 1fr;
-  }
-
-  .register-card {
-    padding: 1.5rem;
-    margin: 10px;
-  }
-
-  .success-icon {
-    font-size: 3rem;
   }
 }
 </style>
