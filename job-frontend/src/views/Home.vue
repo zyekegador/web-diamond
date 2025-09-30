@@ -1,29 +1,23 @@
 <template>
   <div class="home-container">
     <section class="hero-section">
-      <div class="logo-section">
-        <img src="@/assets/logo.png" alt="Company Logo" class="logo" />
-        <span class="company-name">About Butuan</span>
+      <div class="header-in-hero">
+        <div class="logo-section">
+          <img src="@/assets/logo.png" alt="Company Logo" class="logo" />
+          <span class="company-name">ABOUT BUTUAN</span>
+        </div>
       </div>
       <div class="hero-overlay">
         <div class="hero-content">
-          <div class="company-branding">
-            <img
-              src="@/assets/company-logo.png"
-              alt="Company Branding"
-              class="brand-logo"
-            />
-          </div>
-
           <div class="social-icons">
             <a href="#" class="social-icon instagram">
-              <i class="fab fa-instagram"></i>
+              <font-awesome-icon :icon="['fab', 'instagram']" />
             </a>
             <a href="#" class="social-icon facebook">
-              <i class="fab fa-facebook"></i>
+              <font-awesome-icon :icon="['fab', 'facebook']" />
             </a>
             <a href="#" class="social-icon whatsapp">
-              <i class="fab fa-whatsapp"></i>
+              <font-awesome-icon :icon="['fab', 'whatsapp']" />
             </a>
           </div>
         </div>
@@ -35,11 +29,10 @@
       <div class="access-container">
         <div class="access-box">
           <h2>CHOOSE YOUR ACCESS TYPE</h2>
-
           <div class="access-buttons">
             <router-link to="/login" class="access-btn applicant-btn">
               <div class="btn-icon">
-                <i class="fas fa-user"></i>
+                <font-awesome-icon :icon="['fas', 'user']" />
               </div>
               <div class="btn-text">
                 <span class="btn-title">APPLICANT</span>
@@ -49,7 +42,7 @@
 
             <router-link to="/login" class="access-btn hr-btn">
               <div class="btn-icon">
-                <i class="fas fa-briefcase"></i>
+                <font-awesome-icon :icon="['fas', 'briefcase']" />
               </div>
               <div class="btn-text">
                 <span class="btn-title">HR STAFF</span>
@@ -66,10 +59,8 @@
           </div>
         </div>
 
-        <!-- Quick Links Section -->
         <div class="quick-links">
           <h3>QUICK LINKS</h3>
-
           <div class="link-cards">
             <a
               href="https://jobstreet.com"
@@ -78,7 +69,6 @@
             >
               <img src="@/assets/jobstreet-logo.png" alt="JobStreet" />
             </a>
-
             <a
               href="https://outlook.com"
               target="_blank"
@@ -86,7 +76,6 @@
             >
               <img src="@/assets/outlook-logo.png" alt="Outlook" />
             </a>
-
             <a href="https://csc.gov.ph" target="_blank" class="link-card csc">
               <img src="@/assets/csc-logo.png" alt="Civil Service Commission" />
             </a>
@@ -137,17 +126,31 @@ export default {
   flex-direction: column;
 }
 
-/* Header Styles */
 .header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 15px 40px;
-  background-color: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  position: sticky;
+  display: none;
+}
+
+/* Hero Section */
+.hero-section {
+  position: relative;
+  height: 400px;
+  background: url("@/assets/company-logo.png") center/cover;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-color: #f5f5f5;
+  overflow: hidden;
+}
+
+.header-in-hero {
+  position: absolute;
   top: 0;
-  z-index: 100;
+  left: 0;
+  right: 0;
+  z-index: 10;
+  padding: 15px 40px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .logo-section {
@@ -159,37 +162,14 @@ export default {
 .logo {
   width: 100px;
   height: 50px;
-  border-radius: 50%;
   object-fit: cover;
-  padding: 10px;
 }
 
 .company-name {
   font-weight: 600;
-  font-size: 18px;
-  color: #333;
-}
-
-.nav-links a {
-  color: #333;
-  text-decoration: none;
-  font-weight: 500;
-  font-size: 14px;
-  transition: color 0.3s;
-}
-
-.nav-links a:hover {
-  color: #4caf50;
-}
-
-/* Hero Section */
-.hero-section {
-  position: relative;
-  height: 400px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  background-image: url("https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200");
-  background-size: cover;
-  background-position: center;
+  font-size: 16px;
+  color: #1a237e;
+  letter-spacing: 0.5px;
 }
 
 .hero-overlay {
@@ -199,61 +179,45 @@ export default {
   right: 0;
   bottom: 0;
   background: linear-gradient(
-    135deg,
-    rgba(102, 126, 234, 0.8) 0%,
-    rgba(118, 75, 162, 0.8) 100%
+    to right,
+    rgba(255, 255, 255, 0.3) 0%,
+    rgba(255, 255, 255, 0.1) 60%,
+    transparent 100%
   );
   display: flex;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-end;
+  justify-content: flex-end;
+  padding: 30px 40px;
 }
 
 .hero-content {
-  text-align: center;
-  color: white;
-}
-
-.company-branding {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 20px;
-}
-
-.brand-logo {
-  width: 200px;
-  height: auto;
-  filter: brightness(0) invert(1);
-}
-
-.tagline {
-  font-size: 36px;
-  font-weight: 700;
-  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+  position: relative;
+  z-index: 3;
 }
 
 .social-icons {
   display: flex;
-  gap: 15px;
-  margin-top: 30px;
-  justify-content: center;
+  gap: 12px;
+  padding-right: 25px;
 }
 
 .social-icon {
-  width: 45px;
-  height: 45px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   color: white;
-  font-size: 20px;
-  transition: transform 0.3s;
+  font-size: 18px;
+  transition: transform 0.3s, box-shadow 0.3s;
   text-decoration: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
 .social-icon:hover {
-  transform: scale(1.1);
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .instagram {
@@ -278,8 +242,8 @@ export default {
 /* Access Section */
 .access-section {
   flex: 1;
-  padding: 60px 20px;
-  background: linear-gradient(to bottom, #f5f7fa 0%, #c3cfe2 100%);
+  padding: 50px 20px;
+  background: linear-gradient(to bottom, #e3f2fd 0%, #bbdefb 100%);
 }
 
 .access-container {
@@ -293,93 +257,101 @@ export default {
 
 .access-box {
   background: white;
-  padding: 40px;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  padding: 40px 35px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .access-box h2 {
   text-align: center;
-  color: #333;
-  font-size: 22px;
+  color: #1a237e;
+  font-size: 18px;
   margin-bottom: 30px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .access-buttons {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 18px;
 }
 
 .access-btn {
   display: flex;
   align-items: center;
-  gap: 20px;
-  padding: 20px 25px;
-  border-radius: 12px;
+  gap: 18px;
+  padding: 18px 22px;
+  border-radius: 30px;
   text-decoration: none;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
   cursor: pointer;
 }
 
 .applicant-btn {
-  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+  background: #1a237e;
   color: white;
 }
 
 .applicant-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(30, 60, 114, 0.3);
+  background: #0d1642;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(26, 35, 126, 0.25);
 }
 
 .hr-btn {
-  background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%);
+  background: #4caf50;
   color: white;
 }
 
 .hr-btn:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 20px rgba(86, 171, 47, 0.3);
+  background: #43a047;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(76, 175, 80, 0.25);
 }
 
 .btn-icon {
-  width: 50px;
-  height: 50px;
-  background: rgba(255, 255, 255, 0.2);
+  width: 45px;
+  height: 45px;
+  background: rgba(255, 255, 255, 0.25);
   border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 24px;
+  font-size: 22px;
+  flex-shrink: 0;
 }
 
 .btn-text {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
+  text-align: left;
 }
 
 .btn-title {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.5px;
 }
 
 .btn-subtitle {
-  font-size: 13px;
-  opacity: 0.9;
+  font-size: 12px;
+  opacity: 0.95;
+  font-weight: 400;
 }
 
 .register-link {
   text-align: center;
   margin-top: 25px;
   padding-top: 25px;
-  border-top: 1px solid #eee;
+  border-top: 1px solid #e0e0e0;
+  font-size: 14px;
+  color: #666;
 }
 
 .register-link a {
-  color: #4caf50;
+  color: #1976d2;
   text-decoration: none;
   font-weight: 600;
 }
@@ -391,17 +363,18 @@ export default {
 /* Quick Links */
 .quick-links {
   background: white;
-  padding: 30px;
-  border-radius: 20px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  padding: 35px 30px;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
 
 .quick-links h3 {
   text-align: center;
-  color: #333;
+  color: #1a237e;
   font-size: 18px;
   margin-bottom: 25px;
-  font-weight: 600;
+  font-weight: 700;
+  letter-spacing: 0.5px;
 }
 
 .link-cards {
@@ -411,45 +384,46 @@ export default {
 }
 
 .link-card {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   padding: 20px;
-  background: #f8f9fa;
-  border-radius: 12px;
-  text-align: center;
+  border-radius: 10px;
   text-decoration: none;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .link-card:hover {
-  transform: translateX(5px);
-  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .link-card img {
   max-width: 100%;
-  height: 50px;
+  height: 45px;
   object-fit: contain;
 }
 
 .jobstreet {
-  background: linear-gradient(135deg, #ff0084 0%, #ff6b9d 100%);
+  background: linear-gradient(135deg, #e91e63 0%, #f06292 100%);
 }
 
 .outlook {
-  background: linear-gradient(135deg, #0078d4 0%, #50a3e8 100%);
+  background: linear-gradient(135deg, #0078d4 0%, #4ba3e8 100%);
 }
 
 .csc {
-  background: linear-gradient(135deg, #c41e3a 0%, #e63946 100%);
+  background: linear-gradient(135deg, #1565c0 0%, #1976d2 100%);
 }
 
 /* Footer */
 .footer {
-  background: #2c3e50;
+  background: #263238;
   color: white;
   text-align: center;
   padding: 20px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* Responsive */
@@ -458,7 +432,7 @@ export default {
     grid-template-columns: 1fr;
   }
 
-  .header {
+  .header-in-hero {
     padding: 15px 20px;
   }
 
@@ -466,36 +440,50 @@ export default {
     height: 300px;
   }
 
-  .tagline {
-    font-size: 28px;
+  .hero-overlay {
+    padding: 20px;
   }
 
-  .brand-logo {
-    width: 150px;
+  .social-icons {
+    gap: 10px;
+  }
+
+  .social-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 16px;
   }
 }
 
 @media (max-width: 600px) {
   .access-box {
-    padding: 25px;
+    padding: 30px 20px;
   }
 
   .access-btn {
-    padding: 15px 20px;
+    padding: 16px 18px;
   }
 
   .btn-icon {
     width: 40px;
     height: 40px;
-    font-size: 20px;
+    font-size: 18px;
   }
 
   .btn-title {
-    font-size: 16px;
+    font-size: 15px;
   }
 
   .btn-subtitle {
-    font-size: 12px;
+    font-size: 11px;
+  }
+
+  .hero-section {
+    height: 250px;
+  }
+
+  .link-card img {
+    height: 38px;
   }
 }
 </style>

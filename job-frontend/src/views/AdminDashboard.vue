@@ -1,177 +1,552 @@
 <template>
-  <div class="admin-panel">
-    <header class="admin-header">
-      <h1>Admin Panel</h1>
-      <router-link to="/dashboard" class="back-btn"
-        >← Back to Dashboard</router-link
-      >
-    </header>
+  <div class="admin-dashboard">
+    <nav class="dashboard-nav">
+      <div class="nav-brand">
+        <h2>Admin Panel</h2>
+      </div>
+      <div class="nav-user">
+        <span>Welcome, {{ user.username }}</span>
+        <button @click="handleLogout" class="btn-logout">Logout</button>
+      </div>
+    </nav>
 
-    <main class="admin-content">
-      <div class="pending-approvals">
-        <h2>Pending HR Approvals</h2>
+    <div class="dashboard-container">
+      <aside class="sidebar">
+        <ul class="sidebar-menu">
+          <li
+            :class="{ active: activeTab === 'overview' }"
+            @click="activeTab = 'overview'"
+          >
+            <i class="fas fa-chart-line"></i>
+            <span>Overview</span>
+          </li>
+          <li
+            :class="{ active: activeTab === 'create-hr' }"
+            @click="activeTab = 'create-hr'"
+          >
+            <i class="fas fa-user-plus"></i>
+            <span>Create HR Account</span>
+          </li>
+          <li
+            :class="{ active: activeTab === 'hr-list' }"
+            @click="activeTab = 'hr-list'"
+          >
+            <i class="fas fa-users"></i>
+            <span>HR Staff List</span>
+          </li>
+        </ul>
+      </aside>
 
-        <div v-if="loading" class="loading">Loading pending users...</div>
-
-        <div v-else-if="pendingUsers.length === 0" class="no-data">
-          No pending HR approvals
-        </div>
-
-        <div v-else class="user-list">
-          <div v-for="user in pendingUsers" :key="user.id" class="user-card">
-            <div class="user-info">
-              <h3>{{ user.username }}</h3>
-              <p>{{ user.email }}</p>
-              <span class="user-type">{{ user.user_type.toUpperCase() }}</span>
+      <main class="main-content">
+        <!-- Overview Tab -->
+        <div v-if="activeTab === 'overview'" class="content-section">
+          <h1>System Overview</h1>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-icon blue">
+                <i class="fas fa-users"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Total HR Staff</h3>
+                <p class="stat-number">{{ stats.hrCount }}</p>
+              </div>
             </div>
 
-            <button
-              @click="approveUser(user.id)"
-              class="approve-btn"
-              :disabled="approving === user.id"
-            >
-              {{ approving === user.id ? "Approving..." : "Approve" }}
-            </button>
+            <div class="stat-card">
+              <div class="stat-icon green">
+                <i class="fas fa-user-check"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Total Applicants</h3>
+                <p class="stat-number">{{ stats.applicantCount }}</p>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon orange">
+                <i class="fas fa-briefcase"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Active Jobs</h3>
+                <p class="stat-number">{{ stats.jobCount }}</p>
+              </div>
+            </div>
+
+            <div class="stat-card">
+              <div class="stat-icon purple">
+                <i class="fas fa-file-alt"></i>
+              </div>
+              <div class="stat-info">
+                <h3>Total Applications</h3>
+                <p class="stat-number">{{ stats.applicationCount }}</p>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-    </main>
+
+        <!-- Create HR Tab -->
+        <div v-if="activeTab === 'create-hr'" class="content-section">
+          <h1>Create HR Account</h1>
+          <div class="form-container">
+            <form @submit.prevent="createHR" class="hr-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>First Name *</label>
+                  <input type="text" v-model="hrForm.first_name" required />
+                </div>
+                <div class="form-group">
+                  <label>Last Name *</label>
+                  <input type="text" v-model="hrForm.last_name" required />
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Username *</label>
+                <input type="text" v-model="hrForm.username" required />
+              </div>
+
+              <div class="form-group">
+                <label>Email *</label>
+                <input type="email" v-model="hrForm.email" required />
+              </div>
+
+              <div class="form-group">
+                <label>Employee ID</label>
+                <input type="text" v-model="hrForm.employee_id" />
+              </div>
+
+              <div class="form-group">
+                <label>Department</label>
+                <input type="text" v-model="hrForm.department" />
+              </div>
+
+              <div class="form-group">
+                <label>Phone Number</label>
+                <input type="tel" v-model="hrForm.phone_number" />
+              </div>
+
+              <div class="form-group">
+                <label>Password *</label>
+                <input type="password" v-model="hrForm.password" required />
+              </div>
+
+              <div v-if="error" class="error-message">{{ error }}</div>
+              <div v-if="success" class="success-message">{{ success }}</div>
+
+              <button type="submit" class="btn-primary" :disabled="loading">
+                {{ loading ? "Creating..." : "Create HR Account" }}
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- HR List Tab -->
+        <div v-if="activeTab === 'hr-list'" class="content-section">
+          <h1>HR Staff List</h1>
+          <div class="table-container">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Username</th>
+                  <th>Email</th>
+                  <th>Department</th>
+                  <th>Phone</th>
+                  <th>Date Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="hr in hrList" :key="hr.id">
+                  <td>{{ hr.employee_id || "N/A" }}</td>
+                  <td>{{ hr.first_name }} {{ hr.last_name }}</td>
+                  <td>{{ hr.username }}</td>
+                  <td>{{ hr.email }}</td>
+                  <td>{{ hr.department || "N/A" }}</td>
+                  <td>{{ hr.phone_number || "N/A" }}</td>
+                  <td>{{ formatDate(hr.created_at) }}</td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="hrList.length === 0" class="no-data">
+              No HR staff found
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
   </div>
 </template>
 
-<script setup>
-import { ref, onMounted } from "vue";
-import axios from "axios";
+<script>
+import api from "@/services/api";
 
-const pendingUsers = ref([]);
-const loading = ref(true);
-const approving = ref(null);
+export default {
+  name: "AdminDashboard",
+  data() {
+    return {
+      user: JSON.parse(localStorage.getItem("user") || "{}"),
+      activeTab: "overview",
+      stats: {
+        hrCount: 0,
+        applicantCount: 0,
+        jobCount: 0,
+        applicationCount: 0,
+      },
+      hrForm: {
+        username: "",
+        email: "",
+        password: "",
+        first_name: "",
+        last_name: "",
+        phone_number: "",
+        department: "",
+        employee_id: "",
+      },
+      hrList: [],
+      error: "",
+      success: "",
+      loading: false,
+    };
+  },
+  mounted() {
+    this.loadHRList();
+  },
+  methods: {
+    async loadHRList() {
+      try {
+        const response = await api.getHRList();
+        this.hrList = response.data;
+        this.stats.hrCount = this.hrList.length;
+      } catch (error) {
+        console.error("Error loading HR list:", error);
+      }
+    },
+    async createHR() {
+      this.loading = true;
+      this.error = "";
+      this.success = "";
 
-const fetchPendingUsers = async () => {
-  try {
-    const response = await axios.get("/auth/admin/pending-hr/");
-    pendingUsers.value = response.data;
-  } catch (error) {
-    console.error("Error fetching pending users:", error);
-  } finally {
-    loading.value = false;
-  }
+      try {
+        await api.createHR(this.hrForm);
+        this.success = "HR account created successfully!";
+        this.hrForm = {
+          username: "",
+          email: "",
+          password: "",
+          first_name: "",
+          last_name: "",
+          phone_number: "",
+          department: "",
+          employee_id: "",
+        };
+        this.loadHRList();
+      } catch (error) {
+        if (error.response?.data) {
+          const errors = error.response.data;
+          this.error = Object.values(errors).flat().join(" ");
+        } else {
+          this.error = "Failed to create HR account";
+        }
+      } finally {
+        this.loading = false;
+      }
+    },
+    handleLogout() {
+      api.logout();
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("userType");
+      this.$router.push("/login");
+    },
+    formatDate(dateString) {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    },
+  },
 };
-
-const approveUser = async (userId) => {
-  approving.value = userId;
-  try {
-    await axios.post(`/auth/admin/approve-hr/${userId}/`);
-    // Remove approved user from list
-    pendingUsers.value = pendingUsers.value.filter(
-      (user) => user.id !== userId
-    );
-    alert("User approved successfully!");
-  } catch (error) {
-    console.error("Error approving user:", error);
-    alert("Error approving user");
-  } finally {
-    approving.value = null;
-  }
-};
-
-onMounted(fetchPendingUsers);
 </script>
 
 <style scoped>
-.admin-panel {
+.admin-dashboard {
   min-height: 100vh;
-  background-color: #f8f9fa;
+  background: #f5f7fa;
 }
 
-.admin-header {
+.dashboard-nav {
   background: white;
-  padding: 1rem 2rem;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 15px 30px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.back-btn {
-  background-color: #6c757d;
-  color: white;
-  text-decoration: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+.nav-brand h2 {
+  color: #333;
+  font-size: 24px;
 }
 
-.back-btn:hover {
-  background-color: #5a6268;
-}
-
-.admin-content {
-  padding: 2rem;
-}
-
-.pending-approvals {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
-
-.loading,
-.no-data {
-  text-align: center;
-  padding: 2rem;
-  color: #6c757d;
-}
-
-.user-list {
-  display: grid;
-  gap: 1rem;
-  margin-top: 1rem;
-}
-
-.user-card {
+.nav-user {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 1rem;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  background-color: #f8f9fa;
+  gap: 20px;
 }
 
-.user-info h3 {
-  margin: 0 0 0.5rem 0;
-}
-
-.user-info p {
-  margin: 0 0 0.5rem 0;
-  color: #6c757d;
-}
-
-.user-type {
-  background-color: #ffc107;
-  color: #212529;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-  font-size: 0.875rem;
-  font-weight: bold;
-}
-
-.approve-btn {
-  background-color: #28a745;
+.btn-logout {
+  padding: 8px 20px;
+  background: #f44336;
   color: white;
   border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
+  border-radius: 5px;
   cursor: pointer;
 }
 
-.approve-btn:hover:not(:disabled) {
-  background-color: #218838;
+.btn-logout:hover {
+  background: #d32f2f;
 }
 
-.approve-btn:disabled {
-  background-color: #6c757d;
+.dashboard-container {
+  display: flex;
+  min-height: calc(100vh - 70px);
+}
+
+.sidebar {
+  width: 250px;
+  background: white;
+  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar-menu {
+  list-style: none;
+  padding: 20px 0;
+}
+
+.sidebar-menu li {
+  padding: 15px 25px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: all 0.3s;
+}
+
+.sidebar-menu li:hover {
+  background: #f5f7fa;
+}
+
+.sidebar-menu li.active {
+  background: #4caf50;
+  color: white;
+  border-right: 4px solid #45a049;
+}
+
+.sidebar-menu li i {
+  font-size: 18px;
+  width: 20px;
+}
+
+.main-content {
+  flex: 1;
+  padding: 30px;
+}
+
+.content-section h1 {
+  margin-bottom: 30px;
+  color: #333;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+  margin-top: 20px;
+}
+
+.stat-card {
+  background: white;
+  padding: 25px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.stat-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
+}
+
+.stat-icon.blue {
+  background: #2196f3;
+}
+.stat-icon.green {
+  background: #4caf50;
+}
+.stat-icon.orange {
+  background: #ff9800;
+}
+.stat-icon.purple {
+  background: #9c27b0;
+}
+
+.stat-info h3 {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 5px;
+}
+
+.stat-number {
+  font-size: 32px;
+  font-weight: 700;
+  color: #333;
+}
+
+.form-container {
+  background: white;
+  padding: 30px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 600px;
+}
+
+.hr-form .form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 15px;
+}
+
+.form-group {
+  margin-bottom: 20px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 5px;
+  color: #555;
+  font-weight: 500;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 14px;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #4caf50;
+}
+
+.btn-primary {
+  width: 100%;
+  padding: 12px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 16px;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+.btn-primary:hover {
+  background: #45a049;
+}
+
+.btn-primary:disabled {
+  background: #ccc;
   cursor: not-allowed;
+}
+
+.error-message {
+  color: #f44336;
+  padding: 10px;
+  background: #ffebee;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.success-message {
+  color: #4caf50;
+  padding: 10px;
+  background: #e8f5e9;
+  border-radius: 5px;
+  margin-bottom: 10px;
+}
+
+.table-container {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.data-table th,
+.data-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid #eee;
+}
+
+.data-table th {
+  background: #f5f7fa;
+  font-weight: 600;
+  color: #333;
+}
+
+.data-table tr:hover {
+  background: #f9f9f9;
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: #999;
+}
+
+@media (max-width: 768px) {
+  .dashboard-container {
+    flex-direction: column;
+  }
+
+  .sidebar {
+    width: 100%;
+  }
+
+  .sidebar-menu {
+    display: flex;
+    overflow-x: auto;
+  }
+
+  .sidebar-menu li {
+    white-space: nowrap;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .hr-form .form-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -9,12 +9,15 @@ const api = axios.create({
   },
 });
 
-// Add token to requests
+// Add token to all requests
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem("token");
     if (token) {
       config.headers.Authorization = `Token ${token}`;
+      console.log("Sending token:", token); // Debug line
+    } else {
+      console.log("⚠️ No token found in localStorage"); // Debug line
     }
     return config;
   },
@@ -28,6 +31,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
+      console.log("❌ 401 Unauthorized - clearing storage");
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("userType");

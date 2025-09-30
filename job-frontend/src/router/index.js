@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import Home from "../views/Home.vue";
 import Login from "../views/Login.vue";
-import Register from "../views/Register.vue";
+import ApplicantRegister from "@/views/ApplicantRegister.vue";
 import JobList from "../views/JobList.vue";
 import JobDetail from "../views/JobDetail.vue";
 
@@ -34,7 +34,7 @@ const routes = [
   {
     path: "/register",
     name: "Register",
-    component: Register,
+    component: ApplicantRegister,
   },
   {
     path: "/jobs",
