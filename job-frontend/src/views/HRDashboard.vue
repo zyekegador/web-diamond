@@ -1,3 +1,253 @@
+<script>
+import api from "@/services/api";
+
+export default {
+  name: "HRDashboard",
+  data() {
+    return {
+      user: JSON.parse(localStorage.getItem("user") || "{}"),
+      activeView: "participants",
+      searchQuery: "",
+      selectedJob: "",
+      showUserMenu: false,
+      jobs: [],
+      applications: [],
+      showCreateJobModal: false,
+      selectedApplication: null,
+      jobForm: {
+        title: "",
+        plantilla_no: "",
+        pay_grade: "",
+        salary_range: "",
+        job_type: "",
+        location: "",
+        eligibility: "",
+        education: "",
+        training: "",
+        work_experience: "",
+        description: "",
+        requirements: "",
+        posting_date: "",
+        deadline: "",
+      },
+      statusForm: {
+        status: "",
+        notes: "",
+      },
+      error: "",
+      success: "",
+      loading: false,
+
+      showEligibilitySuggestions: false,
+      showEducationSuggestions: false,
+      eligibilityOptions: [],
+      educationOptions: [],
+      filteredEligibility: [],
+      filteredEducation: [],
+    };
+  },
+  computed: {
+    filteredApplications() {
+      if (!this.selectedJob) return [];
+      return this.applications.filter((app) => app.job.id == this.selectedJob);
+    },
+  },
+  async mounted() {
+    await this.loadOptions();
+    this.loadJobs();
+    this.loadAllApplications();
+
+    // Close dropdowns when clicking outside
+    document.addEventListener("click", (e) => {
+      if (!e.target.closest(".autocomplete-wrapper")) {
+        this.closeAllSuggestions();
+      }
+      if (!e.target.closest(".user-menu")) {
+        this.closeUserMenu();
+      }
+    });
+  },
+  beforeUnmount() {
+    document.removeEventListener("click", this.closeUserMenu);
+  },
+  methods: {
+    toggleUserMenu() {
+      this.showUserMenu = !this.showUserMenu;
+    },
+    closeUserMenu() {
+      this.showUserMenu = false;
+    },
+    async loadOptions() {
+      try {
+        const [eduRes, eligRes] = await Promise.all([
+          api.getEducationOptions(),
+          api.getEligibilityOptions(),
+        ]);
+
+        // Flatten education options from categories
+        this.educationOptions = eduRes.data.flatMap((cat) =>
+          cat.programs.map((prog) => prog.name)
+        );
+
+        // Flatten eligibility options from categories
+        this.eligibilityOptions = eligRes.data.flatMap((cat) =>
+          cat.types.map((type) => type.name)
+        );
+      } catch (error) {
+        console.error("Error loading options:", error);
+        // Fallback to empty arrays if backend fails
+        this.educationOptions = [];
+        this.eligibilityOptions = [];
+      }
+    },
+    filterEligibility() {
+      if (!this.jobForm.eligibility) {
+        this.filteredEligibility = this.eligibilityOptions;
+      } else {
+        const search = this.jobForm.eligibility.toLowerCase();
+        this.filteredEligibility = this.eligibilityOptions.filter((option) =>
+          option.toLowerCase().includes(search)
+        );
+      }
+      this.showEligibilitySuggestions = true;
+    },
+    selectEligibility(option) {
+      this.jobForm.eligibility = option;
+      this.showEligibilitySuggestions = false;
+    },
+    filterEducation() {
+      if (!this.jobForm.education) {
+        this.filteredEducation = this.educationOptions;
+      } else {
+        const search = this.jobForm.education.toLowerCase();
+        this.filteredEducation = this.educationOptions.filter((option) =>
+          option.toLowerCase().includes(search)
+        );
+      }
+      this.showEducationSuggestions = true;
+    },
+    selectEducation(option) {
+      this.jobForm.education = option;
+      this.showEducationSuggestions = false;
+    },
+    closeAllSuggestions() {
+      this.showEligibilitySuggestions = false;
+      this.showEducationSuggestions = false;
+    },
+    async loadJobs() {
+      try {
+        const response = await api.getHRJobs();
+        this.jobs = response.data;
+      } catch (error) {
+        console.error("Error loading jobs:", error);
+      }
+    },
+    async loadAllApplications() {
+      try {
+        if (this.jobs.length === 0) return;
+        const promises = this.jobs.map((job) => api.getJobApplications(job.id));
+        const results = await Promise.all(promises);
+        this.applications = results.flatMap((res) => res.data);
+      } catch (error) {
+        console.error("Error loading applications:", error);
+      }
+    },
+    async createJob() {
+      this.loading = true;
+      this.error = "";
+      this.success = "";
+
+      try {
+        const fullDescription = `
+Position: ${this.jobForm.title}
+Plantilla Item No: ${this.jobForm.plantilla_no || "N/A"}
+Pay Grade: ${this.jobForm.pay_grade || "N/A"}
+Eligibility: ${this.jobForm.eligibility}
+Education: ${this.jobForm.education}
+Training: ${this.jobForm.training || "None Required"}
+Work Experience: ${this.jobForm.work_experience || "None Required"}
+
+${this.jobForm.description}
+        `;
+
+        await api.createJob({
+          title: this.jobForm.title,
+          description: fullDescription,
+          requirements: this.jobForm.requirements,
+          job_type: this.jobForm.job_type,
+          location: this.jobForm.location,
+          salary_range: this.jobForm.salary_range,
+          deadline: this.jobForm.deadline,
+        });
+
+        this.success = "Job posted successfully!";
+        setTimeout(() => {
+          this.closeCreateModal();
+          this.loadJobs();
+        }, 1500);
+      } catch (error) {
+        this.error = "Failed to create job posting";
+      } finally {
+        this.loading = false;
+      }
+    },
+    closeCreateModal() {
+      this.showCreateJobModal = false;
+      this.jobForm = {
+        title: "",
+        plantilla_no: "",
+        pay_grade: "",
+        salary_range: "",
+        job_type: "",
+        location: "",
+        eligibility: "",
+        education: "",
+        training: "",
+        work_experience: "",
+        description: "",
+        requirements: "",
+        posting_date: "",
+        deadline: "",
+      };
+      this.error = "";
+      this.success = "";
+    },
+    viewApplication(app) {
+      this.selectedApplication = app;
+      this.statusForm.status = app.status;
+      this.statusForm.notes = app.notes || "";
+    },
+    async updateStatus() {
+      try {
+        await api.updateApplicationStatus(
+          this.selectedApplication.id,
+          this.statusForm
+        );
+        alert("Status updated successfully!");
+        this.selectedApplication = null;
+        this.loadAllApplications();
+      } catch (error) {
+        alert("Failed to update status");
+      }
+    },
+    handleLogout() {
+      api.logout();
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("userType");
+      this.$router.push("/login");
+    },
+    formatDate(dateString) {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    },
+  },
+};
+</script>
+
 <template>
   <div class="hr-dashboard">
     <!-- Top Header -->
@@ -250,22 +500,61 @@
 
               <div class="form-group">
                 <label>Eligibility *</label>
-                <textarea
-                  v-model="jobForm.eligibility"
-                  rows="2"
-                  required
-                  placeholder="e.g. Career Service Professional / Second Level Eligibility"
-                ></textarea>
+                <div class="autocomplete-wrapper">
+                  <input
+                    type="text"
+                    v-model="jobForm.eligibility"
+                    @input="filterEligibility"
+                    @focus="filterEligibility"
+                    required
+                    placeholder="Start typing or select from suggestions..."
+                  />
+                  <div
+                    v-if="
+                      showEligibilitySuggestions &&
+                      filteredEligibility.length > 0
+                    "
+                    class="suggestions-dropdown"
+                  >
+                    <div
+                      v-for="(option, index) in filteredEligibility"
+                      :key="index"
+                      @click="selectEligibility(option)"
+                      class="suggestion-item"
+                    >
+                      {{ option }}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="form-group">
                 <label>Education *</label>
-                <textarea
-                  v-model="jobForm.education"
-                  rows="2"
-                  required
-                  placeholder="e.g. Bachelor's Degree relevant to the job"
-                ></textarea>
+                <div class="autocomplete-wrapper">
+                  <input
+                    type="text"
+                    v-model="jobForm.education"
+                    @input="filterEducation"
+                    @focus="filterEducation"
+                    required
+                    placeholder="Start typing or select from suggestions..."
+                  />
+                  <div
+                    v-if="
+                      showEducationSuggestions && filteredEducation.length > 0
+                    "
+                    class="suggestions-dropdown"
+                  >
+                    <div
+                      v-for="(option, index) in filteredEducation"
+                      :key="index"
+                      @click="selectEducation(option)"
+                      class="suggestion-item"
+                    >
+                      {{ option }}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div class="form-row">
@@ -443,184 +732,6 @@
   </div>
 </template>
 
-<script>
-import api from "@/services/api";
-
-export default {
-  name: "HRDashboard",
-  data() {
-    return {
-      user: JSON.parse(localStorage.getItem("user") || "{}"),
-      activeView: "participants",
-      searchQuery: "",
-      selectedJob: "",
-      showUserMenu: false,
-      jobs: [],
-      applications: [],
-      showCreateJobModal: false,
-      selectedApplication: null,
-      jobForm: {
-        title: "",
-        plantilla_no: "",
-        pay_grade: "",
-        salary_range: "",
-        job_type: "",
-        location: "",
-        eligibility: "",
-        education: "",
-        training: "",
-        work_experience: "",
-        description: "",
-        requirements: "",
-        posting_date: "",
-        deadline: "",
-      },
-      statusForm: {
-        status: "",
-        notes: "",
-      },
-      error: "",
-      success: "",
-      loading: false,
-    };
-  },
-  computed: {
-    filteredApplications() {
-      if (!this.selectedJob) return [];
-      return this.applications.filter((app) => app.job.id == this.selectedJob);
-    },
-  },
-  mounted() {
-    this.loadJobs();
-    this.loadAllApplications();
-    // Close dropdown when clicking outside
-    document.addEventListener("click", this.closeUserMenu);
-  },
-  beforeUnmount() {
-    document.removeEventListener("click", this.closeUserMenu);
-  },
-  methods: {
-    toggleUserMenu() {
-      this.showUserMenu = !this.showUserMenu;
-    },
-    closeUserMenu() {
-      this.showUserMenu = false;
-    },
-    async loadJobs() {
-      try {
-        const response = await api.getHRJobs();
-        this.jobs = response.data;
-      } catch (error) {
-        console.error("Error loading jobs:", error);
-      }
-    },
-    async loadAllApplications() {
-      try {
-        // Load applications for all jobs
-        const promises = this.jobs.map((job) => api.getJobApplications(job.id));
-        const results = await Promise.all(promises);
-        this.applications = results.flatMap((res) => res.data);
-      } catch (error) {
-        console.error("Error loading applications:", error);
-      }
-    },
-    async createJob() {
-      this.loading = true;
-      this.error = "";
-      this.success = "";
-
-      try {
-        // Combine all fields into description and requirements
-        const fullDescription = `
-Position: ${this.jobForm.title}
-Plantilla Item No: ${this.jobForm.plantilla_no || "N/A"}
-Pay Grade: ${this.jobForm.pay_grade || "N/A"}
-Eligibility: ${this.jobForm.eligibility}
-Education: ${this.jobForm.education}
-Training: ${this.jobForm.training || "None Required"}
-Work Experience: ${this.jobForm.work_experience || "None Required"}
-
-${this.jobForm.description}
-        `;
-
-        await api.createJob({
-          title: this.jobForm.title,
-          description: fullDescription,
-          requirements: this.jobForm.requirements,
-          job_type: this.jobForm.job_type,
-          location: this.jobForm.location,
-          salary_range: this.jobForm.salary_range,
-          deadline: this.jobForm.deadline,
-        });
-
-        this.success = "Job posted successfully!";
-        setTimeout(() => {
-          this.closeCreateModal();
-          this.loadJobs();
-        }, 1500);
-      } catch (error) {
-        this.error = "Failed to create job posting";
-      } finally {
-        this.loading = false;
-      }
-    },
-    closeCreateModal() {
-      this.showCreateJobModal = false;
-      this.jobForm = {
-        title: "",
-        plantilla_no: "",
-        pay_grade: "",
-        salary_range: "",
-        job_type: "",
-        location: "",
-        eligibility: "",
-        education: "",
-        training: "",
-        work_experience: "",
-        description: "",
-        requirements: "",
-        posting_date: "",
-        deadline: "",
-      };
-      this.error = "";
-      this.success = "";
-    },
-    viewApplication(app) {
-      this.selectedApplication = app;
-      this.statusForm.status = app.status;
-      this.statusForm.notes = app.notes || "";
-    },
-    async updateStatus() {
-      try {
-        await api.updateApplicationStatus(
-          this.selectedApplication.id,
-          this.statusForm
-        );
-        alert("Status updated successfully!");
-        this.selectedApplication = null;
-        this.loadAllApplications();
-      } catch (error) {
-        alert("Failed to update status");
-      }
-    },
-    handleLogout() {
-      api.logout();
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("userType");
-      this.$router.push("/login");
-    },
-    formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    },
-  },
-};
-</script>
-
 <style scoped>
 * {
   margin: 0;
@@ -633,7 +744,6 @@ ${this.jobForm.description}
   background: linear-gradient(to bottom, #e8f0f7 0%, #f5f7fa 100%);
 }
 
-/* Top Header */
 .top-header {
   background: white;
   padding: 15px 30px;
@@ -731,7 +841,6 @@ ${this.jobForm.description}
   font-size: 24px;
 }
 
-/* User Dropdown Menu */
 .user-dropdown {
   position: absolute;
   top: calc(100% + 10px);
@@ -823,7 +932,6 @@ ${this.jobForm.description}
   font-size: 16px;
 }
 
-/* Main Navigation */
 .main-nav {
   background: #4a5f8d;
   padding: 0 30px;
@@ -894,7 +1002,6 @@ ${this.jobForm.description}
   background: rgba(255, 255, 255, 0.1);
 }
 
-/* Main Content */
 .main-content {
   padding: 20px 30px;
 }
@@ -907,7 +1014,6 @@ ${this.jobForm.description}
   min-height: 500px;
 }
 
-/* Filter Section */
 .filter-section {
   display: flex;
   gap: 10px;
@@ -939,7 +1045,6 @@ ${this.jobForm.description}
   background: #f5f7fa;
 }
 
-/* Placeholder Message */
 .placeholder-message {
   text-align: center;
   padding: 100px 20px;
@@ -947,7 +1052,6 @@ ${this.jobForm.description}
   font-size: 16px;
 }
 
-/* Applicants Table */
 .applicants-table-wrapper {
   overflow-x: auto;
 }

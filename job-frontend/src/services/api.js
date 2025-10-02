@@ -114,13 +114,18 @@ export default {
   getApplicationDetail(id) {
     return api.get(`/applications/${id}/`);
   },
-
-  // HR Application management
   getJobApplications(jobId) {
     return api.get(`/hr/jobs/${jobId}/applications/`);
   },
 
   updateApplicationStatus(id, data) {
     return api.patch(`/hr/applications/${id}/update-status/`, data);
+  },
+  getEducationOptions() {
+    return api.get("/options/education/");
+  },
+
+  getEligibilityOptions() {
+    return api.get("/options/eligibility/");
   },
 };
