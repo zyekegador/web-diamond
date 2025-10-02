@@ -1,8 +1,12 @@
 <script>
 import api from "@/services/api";
+import CreateJob from "./HRPanel/CreateJob.vue";
 
 export default {
   name: "HRDashboard",
+  components: {
+    CreateJob,
+  },
   data() {
     return {
       user: JSON.parse(localStorage.getItem("user") || "{}"),
@@ -14,36 +18,12 @@ export default {
       applications: [],
       showCreateJobModal: false,
       selectedApplication: null,
-      jobForm: {
-        title: "",
-        plantilla_no: "",
-        pay_grade: "",
-        salary_range: "",
-        job_type: "",
-        location: "",
-        eligibility: "",
-        education: "",
-        training: "",
-        work_experience: "",
-        description: "",
-        requirements: "",
-        posting_date: "",
-        deadline: "",
-      },
       statusForm: {
         status: "",
         notes: "",
       },
-      error: "",
-      success: "",
-      loading: false,
-
-      showEligibilitySuggestions: false,
-      showEducationSuggestions: false,
       eligibilityOptions: [],
       educationOptions: [],
-      filteredEligibility: [],
-      filteredEducation: [],
     };
   },
   computed: {
@@ -100,39 +80,8 @@ export default {
         this.eligibilityOptions = [];
       }
     },
-    filterEligibility() {
-      if (!this.jobForm.eligibility) {
-        this.filteredEligibility = this.eligibilityOptions;
-      } else {
-        const search = this.jobForm.eligibility.toLowerCase();
-        this.filteredEligibility = this.eligibilityOptions.filter((option) =>
-          option.toLowerCase().includes(search)
-        );
-      }
-      this.showEligibilitySuggestions = true;
-    },
-    selectEligibility(option) {
-      this.jobForm.eligibility = option;
-      this.showEligibilitySuggestions = false;
-    },
-    filterEducation() {
-      if (!this.jobForm.education) {
-        this.filteredEducation = this.educationOptions;
-      } else {
-        const search = this.jobForm.education.toLowerCase();
-        this.filteredEducation = this.educationOptions.filter((option) =>
-          option.toLowerCase().includes(search)
-        );
-      }
-      this.showEducationSuggestions = true;
-    },
-    selectEducation(option) {
-      this.jobForm.education = option;
-      this.showEducationSuggestions = false;
-    },
     closeAllSuggestions() {
-      this.showEligibilitySuggestions = false;
-      this.showEducationSuggestions = false;
+      // no-op now, since suggestion states were removed
     },
     async loadJobs() {
       try {
@@ -152,66 +101,6 @@ export default {
         console.error("Error loading applications:", error);
       }
     },
-    async createJob() {
-      this.loading = true;
-      this.error = "";
-      this.success = "";
-
-      try {
-        const fullDescription = `
-Position: ${this.jobForm.title}
-Plantilla Item No: ${this.jobForm.plantilla_no || "N/A"}
-Pay Grade: ${this.jobForm.pay_grade || "N/A"}
-Eligibility: ${this.jobForm.eligibility}
-Education: ${this.jobForm.education}
-Training: ${this.jobForm.training || "None Required"}
-Work Experience: ${this.jobForm.work_experience || "None Required"}
-
-${this.jobForm.description}
-        `;
-
-        await api.createJob({
-          title: this.jobForm.title,
-          description: fullDescription,
-          requirements: this.jobForm.requirements,
-          job_type: this.jobForm.job_type,
-          location: this.jobForm.location,
-          salary_range: this.jobForm.salary_range,
-          deadline: this.jobForm.deadline,
-        });
-
-        this.success = "Job posted successfully!";
-        setTimeout(() => {
-          this.closeCreateModal();
-          this.loadJobs();
-        }, 1500);
-      } catch (error) {
-        this.error = "Failed to create job posting";
-      } finally {
-        this.loading = false;
-      }
-    },
-    closeCreateModal() {
-      this.showCreateJobModal = false;
-      this.jobForm = {
-        title: "",
-        plantilla_no: "",
-        pay_grade: "",
-        salary_range: "",
-        job_type: "",
-        location: "",
-        eligibility: "",
-        education: "",
-        training: "",
-        work_experience: "",
-        description: "",
-        requirements: "",
-        posting_date: "",
-        deadline: "",
-      };
-      this.error = "";
-      this.success = "";
-    },
     viewApplication(app) {
       this.selectedApplication = app;
       this.statusForm.status = app.status;
@@ -230,12 +119,16 @@ ${this.jobForm.description}
         alert("Failed to update status");
       }
     },
+    handleJobCreated() {
+      this.loadJobs();
+      this.loadAllApplications();
+    },
     handleLogout() {
       api.logout();
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("userType");
-      this.$router.push("/login");
+      this.$router.push("/");
     },
     formatDate(dateString) {
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -255,12 +148,7 @@ ${this.jobForm.description}
       <div class="header-left">
         <img src="@/assets/butuanon.png" alt="Logo" class="logo" />
       </div>
-      <div class="header-center">
-        <div class="search-bar">
-          <i class="fas fa-search"></i>
-          <input type="text" v-model="searchQuery" placeholder="Search" />
-        </div>
-      </div>
+
       <div class="header-right">
         <div class="user-menu" @click.stop="toggleUserMenu">
           <div class="user-info">
@@ -269,14 +157,14 @@ ${this.jobForm.description}
             >
             <span class="user-role">Human Resource</span>
           </div>
-          <div class="user-avatar">
-            <i class="fas fa-user-circle"></i>
+          <div class="dropdown-avatar">
+            <font-awesome-icon :icon="['fas', 'user-circle']" />
           </div>
         </div>
         <div v-if="showUserMenu" class="user-dropdown" @click.stop>
           <div class="dropdown-header">
             <div class="dropdown-avatar">
-              <i class="fas fa-user-circle"></i>
+              <font-awesome-icon :icon="['fas', 'user-circle']" />
             </div>
             <div class="dropdown-info">
               <strong>{{ user.first_name }} {{ user.last_name }}</strong>
@@ -300,35 +188,40 @@ ${this.jobForm.description}
           @click="activeView = 'participants'"
         >
           <span>List of Job Posts</span>
-          <i class="fas fa-chevron-down"></i>
+          <font-awesome-icon :icon="['fas', 'chevron-down']" />
         </li>
         <li
           :class="{ active: activeView === 'screening' }"
           @click="activeView = 'screening'"
         >
           <span>Screening Result</span>
-          <i class="fas fa-chevron-down"></i>
+          <font-awesome-icon :icon="['fas', 'chevron-down']" />
         </li>
         <li
           :class="{ active: activeView === 'criteria' }"
           @click="activeView = 'criteria'"
         >
           <span>Criteria</span>
-          <i class="fas fa-chevron-down"></i>
+          <font-awesome-icon :icon="['fas', 'chevron-down']" />
         </li>
       </ul>
       <div class="nav-actions">
         <button @click="showCreateJobModal = true" class="btn-new">
-          <i class="fas fa-plus"></i> New
+          <font-awesome-icon :icon="['fas', 'plus']" /> New
         </button>
+
         <button class="btn-settings">
-          <i class="fas fa-cog"></i>
+          <font-awesome-icon :icon="['fas', 'cog']" />
         </button>
       </div>
     </nav>
 
     <!-- Main Content Area -->
     <main class="main-content">
+      <div class="search-bar inside">
+        <font-awesome-icon :icon="['fas', 'search']" class="search-icon" />
+        <input type="text" v-model="searchQuery" placeholder="Search" />
+      </div>
       <!-- Job Posts List View -->
       <div v-if="activeView === 'participants'" class="content-section">
         <div class="filter-section">
@@ -402,7 +295,6 @@ ${this.jobForm.description}
         </div>
       </div>
 
-      <!-- Screening Result View -->
       <div v-if="activeView === 'screening'" class="content-section">
         <h2>Screening Result</h2>
         <p>Feature coming soon...</p>
@@ -415,221 +307,14 @@ ${this.jobForm.description}
       </div>
     </main>
 
-    <!-- Create Job Modal (CSC Format) -->
-    <div
+    <!-- Create Job Modal -->
+    <CreateJob
       v-if="showCreateJobModal"
-      class="modal-overlay"
-      @click="closeCreateModal"
-    >
-      <div class="modal-content csc-modal" @click.stop>
-        <div class="modal-header">
-          <h2>Create Job Posting (CSC Format)</h2>
-          <button @click="closeCreateModal" class="btn-close">
-            <i class="fas fa-times"></i>
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <form @submit.prevent="createJob" class="csc-form">
-            <div class="form-section">
-              <h3>Position Information</h3>
-
-              <div class="form-group">
-                <label>Position Title *</label>
-                <input
-                  type="text"
-                  v-model="jobForm.title"
-                  required
-                  placeholder="e.g. Administrative Officer II"
-                />
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Plantilla Item No.</label>
-                  <input
-                    type="text"
-                    v-model="jobForm.plantilla_no"
-                    placeholder="e.g. 1081-19"
-                  />
-                </div>
-                <div class="form-group">
-                  <label>Salary/Job/Pay Grade</label>
-                  <input
-                    type="text"
-                    v-model="jobForm.pay_grade"
-                    placeholder="e.g. 11"
-                  />
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Monthly Salary *</label>
-                  <input
-                    type="text"
-                    v-model="jobForm.salary_range"
-                    required
-                    placeholder="e.g. Php 30,024.00"
-                  />
-                </div>
-                <div class="form-group">
-                  <label>Job Type *</label>
-                  <select v-model="jobForm.job_type" required>
-                    <option value="">Select Type</option>
-                    <option value="full_time">Full Time</option>
-                    <option value="part_time">Part Time</option>
-                    <option value="contract">Contract</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Place of Assignment *</label>
-                <input
-                  type="text"
-                  v-model="jobForm.location"
-                  required
-                  placeholder="e.g. City Accounting Department"
-                />
-              </div>
-            </div>
-
-            <div class="form-section">
-              <h3>Qualifications</h3>
-
-              <div class="form-group">
-                <label>Eligibility *</label>
-                <div class="autocomplete-wrapper">
-                  <input
-                    type="text"
-                    v-model="jobForm.eligibility"
-                    @input="filterEligibility"
-                    @focus="filterEligibility"
-                    required
-                    placeholder="Start typing or select from suggestions..."
-                  />
-                  <div
-                    v-if="
-                      showEligibilitySuggestions &&
-                      filteredEligibility.length > 0
-                    "
-                    class="suggestions-dropdown"
-                  >
-                    <div
-                      v-for="(option, index) in filteredEligibility"
-                      :key="index"
-                      @click="selectEligibility(option)"
-                      class="suggestion-item"
-                    >
-                      {{ option }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Education *</label>
-                <div class="autocomplete-wrapper">
-                  <input
-                    type="text"
-                    v-model="jobForm.education"
-                    @input="filterEducation"
-                    @focus="filterEducation"
-                    required
-                    placeholder="Start typing or select from suggestions..."
-                  />
-                  <div
-                    v-if="
-                      showEducationSuggestions && filteredEducation.length > 0
-                    "
-                    class="suggestions-dropdown"
-                  >
-                    <div
-                      v-for="(option, index) in filteredEducation"
-                      :key="index"
-                      @click="selectEducation(option)"
-                      class="suggestion-item"
-                    >
-                      {{ option }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Training</label>
-                  <input
-                    type="text"
-                    v-model="jobForm.training"
-                    placeholder="None Required or specify"
-                  />
-                </div>
-                <div class="form-group">
-                  <label>Work Experience</label>
-                  <input
-                    type="text"
-                    v-model="jobForm.work_experience"
-                    placeholder="None Required or specify"
-                  />
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Job Description/Competency *</label>
-                <textarea
-                  v-model="jobForm.description"
-                  rows="4"
-                  required
-                  placeholder="Describe the job responsibilities and competencies"
-                ></textarea>
-              </div>
-
-              <div class="form-group">
-                <label>Required Documents/Remarks</label>
-                <textarea
-                  v-model="jobForm.requirements"
-                  rows="4"
-                  placeholder="List required documents for application"
-                ></textarea>
-              </div>
-            </div>
-
-            <div class="form-section">
-              <h3>Application Details</h3>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Posting Date *</label>
-                  <input type="date" v-model="jobForm.posting_date" required />
-                </div>
-                <div class="form-group">
-                  <label>Closing Date *</label>
-                  <input type="date" v-model="jobForm.deadline" required />
-                </div>
-              </div>
-            </div>
-
-            <div v-if="error" class="error-message">{{ error }}</div>
-            <div v-if="success" class="success-message">{{ success }}</div>
-
-            <div class="form-actions">
-              <button
-                type="button"
-                @click="closeCreateModal"
-                class="btn-cancel"
-              >
-                Cancel
-              </button>
-              <button type="submit" class="btn-submit" :disabled="loading">
-                {{ loading ? "Creating..." : "Create Job Posting" }}
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    </div>
+      :eligibilityOptions="eligibilityOptions"
+      :educationOptions="educationOptions"
+      @close="showCreateJobModal = false"
+      @jobCreated="handleJobCreated"
+    />
 
     <!-- View Application Modal -->
     <div
@@ -760,20 +445,26 @@ ${this.jobForm.description}
 .header-center {
   flex: 1;
   max-width: 500px;
-  margin: 0 40px;
 }
 
 .search-bar {
-  position: relative;
-  width: 100%;
+  display: flex;
+  align-items: center;
+  border-radius: 5px;
+  padding: 5px 20px;
+  width: 700px;
 }
 
 .search-bar i {
   position: absolute;
-  left: 15px;
   top: 50%;
   transform: translateY(-50%);
   color: #999;
+}
+
+.search-bar .search-icon {
+  margin-right: 8px;
+  color: #888;
 }
 
 .search-bar input {
@@ -783,6 +474,8 @@ ${this.jobForm.description}
   border-radius: 25px;
   background: #f5f7fa;
   font-size: 14px;
+  outline: none;
+  flex: 1;
 }
 
 .search-bar input:focus {

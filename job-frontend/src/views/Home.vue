@@ -4,7 +4,9 @@
       <div class="header-in-hero">
         <div class="logo-section">
           <img src="@/assets/logo.png" alt="Company Logo" class="logo" />
-          <span class="company-name">ABOUT BUTUAN</span>
+          <span class="company-name clickable" @click="showAbout = true"
+            >ABOUT BUTUAN</span
+          >
         </div>
       </div>
       <div class="hero-overlay">
@@ -30,7 +32,10 @@
         <div class="access-box">
           <h2>CHOOSE YOUR ACCESS TYPE</h2>
           <div class="access-buttons">
-            <router-link to="/login" class="access-btn applicant-btn">
+            <router-link
+              to="/login?role=applicant"
+              class="access-btn applicant-btn"
+            >
               <div class="btn-icon">
                 <font-awesome-icon :icon="['fas', 'user']" />
               </div>
@@ -40,7 +45,7 @@
               </div>
             </router-link>
 
-            <router-link to="/login" class="access-btn hr-btn">
+            <router-link to="/login?role=hr" class="access-btn hr-btn">
               <div class="btn-icon">
                 <font-awesome-icon :icon="['fas', 'briefcase']" />
               </div>
@@ -88,12 +93,23 @@
     <footer class="footer">
       <p>&copy; 2024 Company Name. All Rights Reserved.</p>
     </footer>
+
+    <About :isVisible="showAbout" @close="showAbout = false" />
   </div>
 </template>
 
 <script>
+import About from "./About.vue";
 export default {
   name: "Home",
+  components: {
+    About,
+  },
+  data() {
+    return {
+      showAbout: false,
+    };
+  },
   mounted() {
     // Check if user is already logged in
     const token = localStorage.getItem("token");
@@ -166,10 +182,20 @@ export default {
 }
 
 .company-name {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 16px;
   color: #1a237e;
   letter-spacing: 0.5px;
+}
+
+.company-name.clickable {
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.company-name.clickable:hover {
+  color: #667eea;
+  text-decoration: underline;
 }
 
 .hero-overlay {

@@ -300,7 +300,7 @@ export default {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("userType");
-      this.$router.push("/login");
+      this.$router.push("/");
     },
     formatDate(dateString) {
       return new Date(dateString).toLocaleDateString("en-US", {

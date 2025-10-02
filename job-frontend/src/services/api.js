@@ -31,11 +31,16 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      console.log("❌ 401 Unauthorized - clearing storage");
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("userType");
-      window.location.href = "/login";
+      // Check if this is NOT a logout request
+      const isLogoutRequest = error.config.url.includes("/logout/");
+
+      if (!isLogoutRequest) {
+        console.log("❌ 401 Unauthorized - clearing storage");
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        localStorage.removeItem("userType");
+        window.location.href = "/login";
+      }
     }
     return Promise.reject(error);
   }

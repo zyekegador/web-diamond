@@ -6,16 +6,12 @@ import router from "./router";
 import { library } from "@fortawesome/fontawesome-svg-core";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
-// Icons you want to use
-import {
-  faInstagram,
-  faFacebook,
-  faWhatsapp,
-} from "@fortawesome/free-brands-svg-icons";
-import { faUser, faBriefcase } from "@fortawesome/free-solid-svg-icons";
+// Import whole packs
+import { fas } from "@fortawesome/free-solid-svg-icons";
+import { fab } from "@fortawesome/free-brands-svg-icons";
 
-// Add icons to the library
-library.add(faInstagram, faFacebook, faWhatsapp, faUser, faBriefcase);
+// Add all icons from solid + brands
+library.add(fas, fab);
 
 const app = createApp(App);
 
