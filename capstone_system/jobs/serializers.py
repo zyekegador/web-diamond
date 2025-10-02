@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from .models import Job, Application
 from accounts.serializers import UserSerializer
+from .models import EducationCategory, EducationLevel, EligibilityCategory, EligibilityType
 
 class JobSerializer(serializers.ModelSerializer):
     posted_by = UserSerializer(read_only=True)
@@ -60,3 +61,31 @@ class ApplicationStatusUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = ['status', 'notes']
+
+
+class EducationLevelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EducationLevel
+        fields = ['id', 'name', 'abbreviation']
+
+
+class EducationCategorySerializer(serializers.ModelSerializer):
+    programs = EducationLevelSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = EducationCategory
+        fields = ['id', 'name', 'icon', 'programs']
+
+
+class EligibilityTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EligibilityType
+        fields = ['id', 'name', 'code', 'description']
+
+
+class EligibilityCategorySerializer(serializers.ModelSerializer):
+    types = EligibilityTypeSerializer(many=True, read_only=True)
+    
+    class Meta:
+        model = EligibilityCategory
+        fields = ['id', 'name', 'description', 'types']

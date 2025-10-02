@@ -10,7 +10,9 @@ from .views import (
     ApplicantApplicationListView,
     JobApplicationListView,
     ApplicationDetailView,
-    ApplicationStatusUpdateView
+    ApplicationStatusUpdateView,
+    EducationOptionsView,
+    EligibilityOptionsView
 )
 
 urlpatterns = [
@@ -32,4 +34,7 @@ urlpatterns = [
     # HR application management
     path('hr/jobs/<int:job_id>/applications/', JobApplicationListView.as_view(), name='job-applications'),
     path('hr/applications/<int:pk>/update-status/', ApplicationStatusUpdateView.as_view(), name='application-update-status'),
+
+    path('options/education/', EducationOptionsView.as_view(), name='education-options'),
+    path('options/eligibility/', EligibilityOptionsView.as_view(), name='eligibility-options'),
 ]

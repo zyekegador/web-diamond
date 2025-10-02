@@ -1,13 +1,17 @@
 from rest_framework import status, generics, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework import permissions
 from .models import Job, Application
+from .models import EducationCategory, EligibilityCategory
 from .serializers import (
     JobSerializer,
     JobCreateSerializer,
     ApplicationSerializer,
     ApplicationCreateSerializer,
-    ApplicationStatusUpdateSerializer
+    ApplicationStatusUpdateSerializer,
+    EducationCategorySerializer,  
+    EligibilityCategorySerializer
 )
 
 
@@ -166,3 +170,22 @@ class ApplicationStatusUpdateView(generics.UpdateAPIView):
         self.perform_update(serializer)
         
         return Response(ApplicationSerializer(instance).data)
+
+class EducationOptionsView(APIView):
+    """Returns all education options grouped by category"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        categories = EducationCategory.objects.filter(is_active=True).prefetch_related('programs')
+        serializer = EducationCategorySerializer(categories, many=True)
+        return Response(serializer.data)
+
+
+class EligibilityOptionsView(APIView):
+    """Returns all eligibility options grouped by category"""
+    permission_classes = [permissions.AllowAny]
+    
+    def get(self, request):
+        categories = EligibilityCategory.objects.filter(is_active=True).prefetch_related('types')
+        serializer = EligibilityCategorySerializer(categories, many=True)
+        return Response(serializer.data)
