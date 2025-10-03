@@ -1,6 +1,6 @@
 <template>
-  <div class="modal-overlay" @click="$emit('close')">
-    <div class="modal-content csc-modal" @click.stop>
+  <div class="modal-overlay">
+    <div class="modal-content csc-modal">
       <div class="modal-header">
         <h2>Create Job Posting (CSC Format)</h2>
         <button @click="$emit('close')" class="btn-close">

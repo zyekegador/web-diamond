@@ -3,8 +3,6 @@ import Home from "../views/Home.vue";
 import About from "../views/About.vue";
 import Login from "../views/Login.vue";
 import ApplicantRegister from "@/views/ApplicantRegister.vue";
-import JobList from "../views/JobList.vue";
-import JobDetail from "../views/JobDetail.vue";
 
 // Admin Views
 import AdminDashboard from "../views/AdminDashboard.vue";
@@ -41,16 +39,6 @@ const routes = [
     path: "/register",
     name: "Register",
     component: ApplicantRegister,
-  },
-  {
-    path: "/jobs",
-    name: "JobList",
-    component: JobList,
-  },
-  {
-    path: "/jobs/:id",
-    name: "JobDetail",
-    component: JobDetail,
   },
 
   // Admin Routes

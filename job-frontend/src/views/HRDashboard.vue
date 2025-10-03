@@ -12,43 +12,43 @@ export default {
       user: JSON.parse(localStorage.getItem("user") || "{}"),
       activeView: "participants",
       searchQuery: "",
-      selectedJob: "",
       showUserMenu: false,
       jobs: [],
-      applications: [],
       showCreateJobModal: false,
-      selectedApplication: null,
-      statusForm: {
-        status: "",
-        notes: "",
-      },
+      selectedJob: null,
+      showApplicantsModal: false,
+      currentPage: 1,
+      itemsPerPage: 10,
       eligibilityOptions: [],
       educationOptions: [],
     };
   },
   computed: {
-    filteredApplications() {
-      if (!this.selectedJob) return [];
-      return this.applications.filter((app) => app.job.id == this.selectedJob);
+    filteredJobs() {
+      if (!this.searchQuery) return this.paginatedJobs;
+
+      const query = this.searchQuery.toLowerCase();
+      return this.jobs.filter(
+        (job) =>
+          job.title.toLowerCase().includes(query) ||
+          job.location.toLowerCase().includes(query)
+      );
+    },
+    paginatedJobs() {
+      const start = (this.currentPage - 1) * this.itemsPerPage;
+      const end = start + this.itemsPerPage;
+      return this.jobs.slice(start, end);
+    },
+    totalPages() {
+      return Math.ceil(this.jobs.length / this.itemsPerPage);
+    },
+    displayedJobs() {
+      return this.searchQuery ? this.filteredJobs : this.paginatedJobs;
     },
   },
   async mounted() {
     await this.loadOptions();
     this.loadJobs();
-    this.loadAllApplications();
-
-    // Close dropdowns when clicking outside
-    document.addEventListener("click", (e) => {
-      if (!e.target.closest(".autocomplete-wrapper")) {
-        this.closeAllSuggestions();
-      }
-      if (!e.target.closest(".user-menu")) {
-        this.closeUserMenu();
-      }
-    });
-  },
-  beforeUnmount() {
-    document.removeEventListener("click", this.closeUserMenu);
   },
   methods: {
     toggleUserMenu() {
@@ -64,64 +64,57 @@ export default {
           api.getEligibilityOptions(),
         ]);
 
-        // Flatten education options from categories
         this.educationOptions = eduRes.data.flatMap((cat) =>
           cat.programs.map((prog) => prog.name)
         );
 
-        // Flatten eligibility options from categories
         this.eligibilityOptions = eligRes.data.flatMap((cat) =>
           cat.types.map((type) => type.name)
         );
       } catch (error) {
         console.error("Error loading options:", error);
-        // Fallback to empty arrays if backend fails
         this.educationOptions = [];
         this.eligibilityOptions = [];
       }
     },
-    closeAllSuggestions() {
-      // no-op now, since suggestion states were removed
-    },
     async loadJobs() {
       try {
         const response = await api.getHRJobs();
-        this.jobs = response.data;
+        this.jobs = response.data.map((job) => ({
+          ...job,
+          applicationsCount: job.applications?.length || 0,
+          status: this.getJobStatus(job),
+        }));
       } catch (error) {
         console.error("Error loading jobs:", error);
       }
     },
-    async loadAllApplications() {
+    getJobStatus(job) {
+      const deadline = new Date(job.deadline);
+      const today = new Date();
+      const daysLeft = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+
+      if (daysLeft < 0) return { label: "Closed", color: "red" };
+      if (daysLeft <= 5) return { label: "Re-open", color: "yellow" };
+      if (job.applicationsCount > 0)
+        return { label: "Screening", color: "blue" };
+      return { label: "Open", color: "green" };
+    },
+    async viewApplicants(job) {
       try {
-        if (this.jobs.length === 0) return;
-        const promises = this.jobs.map((job) => api.getJobApplications(job.id));
-        const results = await Promise.all(promises);
-        this.applications = results.flatMap((res) => res.data);
+        const response = await api.getJobApplications(job.id);
+        this.selectedJob = {
+          ...job,
+          applications: response.data,
+        };
+        this.showApplicantsModal = true;
       } catch (error) {
         console.error("Error loading applications:", error);
-      }
-    },
-    viewApplication(app) {
-      this.selectedApplication = app;
-      this.statusForm.status = app.status;
-      this.statusForm.notes = app.notes || "";
-    },
-    async updateStatus() {
-      try {
-        await api.updateApplicationStatus(
-          this.selectedApplication.id,
-          this.statusForm
-        );
-        alert("Status updated successfully!");
-        this.selectedApplication = null;
-        this.loadAllApplications();
-      } catch (error) {
-        alert("Failed to update status");
+        alert("Failed to load applicants");
       }
     },
     handleJobCreated() {
       this.loadJobs();
-      this.loadAllApplications();
     },
     handleLogout() {
       api.logout();
@@ -137,6 +130,17 @@ export default {
         day: "numeric",
       });
     },
+    changePage(page) {
+      if (page >= 1 && page <= this.totalPages) {
+        this.currentPage = page;
+      }
+    },
+    getFileUrl(fileUrl) {
+      if (!fileUrl) return null;
+      // Ensure the URL is absolute
+      if (fileUrl.startsWith("http")) return fileUrl;
+      return `${api.defaults.baseURL}${fileUrl}`;
+    },
   },
 };
 </script>
@@ -147,20 +151,34 @@ export default {
     <header class="top-header">
       <div class="header-left">
         <img src="@/assets/butuanon.png" alt="Logo" class="logo" />
+        <div class="header-title">
+          <h1>DASHBOARD</h1>
+        </div>
       </div>
 
       <div class="header-right">
+        <button class="icon-btn">
+          <font-awesome-icon :icon="['fas', 'search']" />
+        </button>
+        <button class="icon-btn">
+          <font-awesome-icon :icon="['fas', 'bell']" />
+        </button>
+        <button class="icon-btn">
+          <font-awesome-icon :icon="['fas', 'cog']" />
+        </button>
+
         <div class="user-menu" @click.stop="toggleUserMenu">
+          <div class="user-avatar">
+            <font-awesome-icon :icon="['fas', 'user-circle']" />
+          </div>
           <div class="user-info">
             <span class="user-name"
               >{{ user.first_name }} {{ user.last_name }}</span
             >
             <span class="user-role">Human Resource</span>
           </div>
-          <div class="dropdown-avatar">
-            <font-awesome-icon :icon="['fas', 'user-circle']" />
-          </div>
         </div>
+
         <div v-if="showUserMenu" class="user-dropdown" @click.stop>
           <div class="dropdown-header">
             <div class="dropdown-avatar">
@@ -180,130 +198,163 @@ export default {
       </div>
     </header>
 
-    <!-- Navigation Bar -->
+    <!-- Navigation Tabs -->
     <nav class="main-nav">
-      <ul class="nav-menu">
-        <li
-          :class="{ active: activeView === 'participants' }"
+      <div class="nav-tabs">
+        <button
+          :class="['nav-tab', { active: activeView === 'participants' }]"
           @click="activeView = 'participants'"
         >
-          <span>List of Job Posts</span>
+          List of Participants
           <font-awesome-icon :icon="['fas', 'chevron-down']" />
-        </li>
-        <li
-          :class="{ active: activeView === 'screening' }"
+        </button>
+        <button
+          :class="['nav-tab', { active: activeView === 'screening' }]"
           @click="activeView = 'screening'"
         >
-          <span>Screening Result</span>
+          Screening Result
           <font-awesome-icon :icon="['fas', 'chevron-down']" />
-        </li>
-        <li
-          :class="{ active: activeView === 'criteria' }"
+        </button>
+        <button
+          :class="['nav-tab', { active: activeView === 'criteria' }]"
           @click="activeView = 'criteria'"
         >
-          <span>Criteria</span>
+          Criteria
           <font-awesome-icon :icon="['fas', 'chevron-down']" />
-        </li>
-      </ul>
-      <div class="nav-actions">
-        <button @click="showCreateJobModal = true" class="btn-new">
-          <font-awesome-icon :icon="['fas', 'plus']" /> New
         </button>
-
-        <button class="btn-settings">
-          <font-awesome-icon :icon="['fas', 'cog']" />
+        <button class="nav-tab">
+          Archive
+          <font-awesome-icon :icon="['fas', 'chevron-down']" />
+        </button>
+        <button class="nav-tab-add" @click="showCreateJobModal = true">
+          <font-awesome-icon :icon="['fas', 'plus']" />
         </button>
       </div>
     </nav>
 
-    <!-- Main Content Area -->
+    <!-- Main Content -->
     <main class="main-content">
-      <div class="search-bar inside">
-        <font-awesome-icon :icon="['fas', 'search']" class="search-icon" />
-        <input type="text" v-model="searchQuery" placeholder="Search" />
-      </div>
-      <!-- Job Posts List View -->
-      <div v-if="activeView === 'participants'" class="content-section">
-        <div class="filter-section">
-          <select v-model="selectedJob" class="filter-select">
-            <option value="">Select Position Title</option>
-            <option v-for="job in jobs" :key="job.id" :value="job.id">
-              {{ job.title }}
-            </option>
-          </select>
-          <button class="btn-filter">
-            <i class="fas fa-filter"></i>
-            <span>Filter</span>
-          </button>
+      <div v-if="activeView === 'participants'" class="content-wrapper">
+        <!-- Search and Actions Bar -->
+        <div class="actions-bar">
+          <div class="search-box">
+            <font-awesome-icon :icon="['fas', 'search']" class="search-icon" />
+            <input
+              type="text"
+              v-model="searchQuery"
+              placeholder="Search jobs..."
+            />
+          </div>
+
+          <div class="action-buttons">
+            <button class="btn-action">
+              <font-awesome-icon :icon="['fas', 'sliders-h']" />
+            </button>
+            <button class="btn-primary" @click="showCreateJobModal = true">
+              Edit
+            </button>
+          </div>
         </div>
 
-        <div v-if="!selectedJob" class="placeholder-message">
-          <p>Please Select Type of Job to View Applicant Entries</p>
-        </div>
-
-        <div v-else class="applicants-table-wrapper">
-          <table class="applicants-table">
+        <!-- Jobs Table -->
+        <div class="table-container">
+          <table class="jobs-table">
             <thead>
               <tr>
-                <th>Phone Number</th>
-                <th>Email</th>
-                <th>First Name</th>
-                <th>Last Name</th>
-                <th>Nationality</th>
-                <th>PDS</th>
+                <th>Job Title</th>
+                <th>Post Date</th>
+                <th>Close Date</th>
+                <th>No. Applicants</th>
+                <th>Files</th>
+                <th>Status</th>
+                <th>View Applicant</th>
               </tr>
             </thead>
             <tbody>
-              <tr
-                v-for="app in filteredApplications"
-                :key="app.id"
-                @click="viewApplication(app)"
-              >
-                <td>{{ app.applicant.phone_number || "N/A" }}</td>
-                <td>{{ app.applicant.email }}</td>
-                <td>{{ app.applicant.first_name }}</td>
-                <td>{{ app.applicant.last_name }}</td>
-                <td>Filipino</td>
+              <tr v-for="job in displayedJobs" :key="job.id">
+                <td class="job-title">{{ job.title }}</td>
+                <td>{{ formatDate(job.created_at) }}</td>
+                <td>{{ formatDate(job.deadline) }}</td>
+                <td class="text-center">{{ job.applicationsCount }}</td>
                 <td>
                   <a
-                    v-if="app.pds"
-                    :href="app.pds"
-                    target="_blank"
+                    v-if="job.applicationsCount > 0"
+                    href="#"
                     class="file-link"
+                    @click.prevent="viewApplicants(job)"
                   >
-                    <i class="fas fa-file-pdf"></i> View
+                    Applications_{{ job.id }}.zip
                   </a>
-                  <span v-else>N/A</span>
+                  <span v-else class="no-files">No files</span>
+                </td>
+                <td>
+                  <span :class="['status-badge', job.status.color]">
+                    {{ job.status.label }}
+                  </span>
+                </td>
+                <td class="text-center">
+                  <button class="btn-view" @click="viewApplicants(job)">
+                    View
+                  </button>
                 </td>
               </tr>
             </tbody>
           </table>
-          <div v-if="filteredApplications.length === 0" class="no-data">
-            Nothing to show...
+
+          <div v-if="displayedJobs.length === 0" class="no-data">
+            <p>No jobs found</p>
           </div>
         </div>
 
         <!-- Pagination -->
         <div class="pagination">
-          <button class="pagination-btn">‹</button>
-          <button class="pagination-btn active">1</button>
-          <button class="pagination-btn">2</button>
-          <button class="pagination-btn">3</button>
-          <button class="pagination-btn">4</button>
-          <button class="pagination-btn">5</button>
-          <button class="pagination-btn">›</button>
+          <span class="pagination-info">
+            {{ (currentPage - 1) * itemsPerPage + 1 }} out of
+            {{ jobs.length }} showing
+          </span>
+
+          <div class="pagination-controls">
+            <button
+              @click="changePage(currentPage - 1)"
+              :disabled="currentPage === 1"
+              class="pagination-btn"
+            >
+              <font-awesome-icon :icon="['fas', 'chevron-left']" />
+            </button>
+
+            <button
+              v-for="page in totalPages"
+              :key="page"
+              @click="changePage(page)"
+              :class="['pagination-btn', { active: currentPage === page }]"
+            >
+              {{ page }}
+            </button>
+
+            <button
+              @click="changePage(currentPage + 1)"
+              :disabled="currentPage === totalPages"
+              class="pagination-btn"
+            >
+              <font-awesome-icon :icon="['fas', 'chevron-right']" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <div v-if="activeView === 'screening'" class="content-section">
-        <h2>Screening Result</h2>
-        <p>Feature coming soon...</p>
+      <!-- Other Views -->
+      <div v-if="activeView === 'screening'" class="content-wrapper">
+        <div class="placeholder">
+          <h2>Screening Result</h2>
+          <p>Feature coming soon...</p>
+        </div>
       </div>
 
-      <!-- Criteria View -->
-      <div v-if="activeView === 'criteria'" class="content-section">
-        <h2>Criteria Management</h2>
-        <p>Feature coming soon...</p>
+      <div v-if="activeView === 'criteria'" class="content-wrapper">
+        <div class="placeholder">
+          <h2>Criteria Management</h2>
+          <p>Feature coming soon...</p>
+        </div>
       </div>
     </main>
 
@@ -316,100 +367,78 @@ export default {
       @jobCreated="handleJobCreated"
     />
 
-    <!-- View Application Modal -->
+    <!-- View Applicants Modal -->
     <div
-      v-if="selectedApplication"
+      v-if="showApplicantsModal"
       class="modal-overlay"
-      @click="selectedApplication = null"
+      @click="showApplicantsModal = false"
     >
-      <div class="modal-content application-modal" @click.stop>
+      <div class="modal-content applicants-modal" @click.stop>
         <div class="modal-header">
-          <h2>Application Details</h2>
-          <button @click="selectedApplication = null" class="btn-close">
-            <i class="fas fa-times"></i>
+          <h2>Applicants for {{ selectedJob?.title }}</h2>
+          <button @click="showApplicantsModal = false" class="btn-close">
+            <font-awesome-icon :icon="['fas', 'times']" />
           </button>
         </div>
 
         <div class="modal-body">
-          <div class="applicant-details">
-            <h3>Applicant Information</h3>
-            <div class="info-grid">
-              <div class="info-item">
-                <strong>Name:</strong>
-                <span
-                  >{{ selectedApplication.applicant.first_name }}
-                  {{ selectedApplication.applicant.last_name }}</span
-                >
-              </div>
-              <div class="info-item">
-                <strong>Email:</strong>
-                <span>{{ selectedApplication.applicant.email }}</span>
-              </div>
-              <div class="info-item">
-                <strong>Phone:</strong>
-                <span>{{
-                  selectedApplication.applicant.phone_number || "N/A"
-                }}</span>
-              </div>
-              <div class="info-item">
-                <strong>Applied Date:</strong>
-                <span>{{ formatDate(selectedApplication.applied_at) }}</span>
-              </div>
-            </div>
-
-            <div class="documents-section">
-              <h3>Submitted Documents</h3>
-              <div class="doc-list">
-                <a
-                  v-if="selectedApplication.resume"
-                  :href="selectedApplication.resume"
-                  target="_blank"
-                  class="doc-item"
-                >
-                  <i class="fas fa-file-pdf"></i> Resume/CV
-                </a>
-                <a
-                  v-if="selectedApplication.pds"
-                  :href="selectedApplication.pds"
-                  target="_blank"
-                  class="doc-item"
-                >
-                  <i class="fas fa-file-pdf"></i> Personal Data Sheet (PDS)
-                </a>
-                <a
-                  v-if="selectedApplication.certificates"
-                  :href="selectedApplication.certificates"
-                  target="_blank"
-                  class="doc-item"
-                >
-                  <i class="fas fa-file-archive"></i> Certificates
-                </a>
-              </div>
-            </div>
-
-            <div class="cover-letter-section">
-              <h3>Cover Letter</h3>
-              <p>{{ selectedApplication.cover_letter }}</p>
-            </div>
-
-            <div class="status-section">
-              <h3>Update Status</h3>
-              <select v-model="statusForm.status" class="status-select">
-                <option value="pending">Pending</option>
-                <option value="under_review">Under Review</option>
-                <option value="shortlisted">Shortlisted</option>
-                <option value="accepted">Accepted</option>
-                <option value="rejected">Rejected</option>
-              </select>
-              <textarea
-                v-model="statusForm.notes"
-                placeholder="Add notes for applicant"
-                rows="3"
-              ></textarea>
-              <button @click="updateStatus" class="btn-update-status">
-                Update Status
-              </button>
-            </div>
+          <div class="applicants-list">
+            <table class="applicants-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Applied Date</th>
+                  <th>Status</th>
+                  <th>Documents</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="app in selectedJob?.applications" :key="app.id">
+                  <td>
+                    {{ app.applicant.first_name }} {{ app.applicant.last_name }}
+                  </td>
+                  <td>{{ app.applicant.email }}</td>
+                  <td>{{ app.applicant.phone_number || "N/A" }}</td>
+                  <td>{{ formatDate(app.applied_at) }}</td>
+                  <td>
+                    <span :class="['status-badge', 'small', app.status]">
+                      {{ app.status }}
+                    </span>
+                  </td>
+                  <td class="documents-cell">
+                    <a
+                      v-if="app.resume"
+                      :href="getFileUrl(app.resume)"
+                      target="_blank"
+                      class="doc-icon"
+                      title="Resume"
+                    >
+                      <font-awesome-icon :icon="['fas', 'file-pdf']" />
+                    </a>
+                    <a
+                      v-if="app.pds"
+                      :href="getFileUrl(app.pds)"
+                      target="_blank"
+                      class="doc-icon"
+                      title="PDS"
+                    >
+                      <font-awesome-icon :icon="['fas', 'file-alt']" />
+                    </a>
+                    <a
+                      v-if="app.certificates"
+                      :href="getFileUrl(app.certificates)"
+                      target="_blank"
+                      class="doc-icon"
+                      title="Certificates"
+                    >
+                      <font-awesome-icon :icon="['fas', 'file-archive']" />
+                    </a>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -426,62 +455,33 @@ export default {
 
 .hr-dashboard {
   min-height: 100vh;
-  background: linear-gradient(to bottom, #e8f0f7 0%, #f5f7fa 100%);
 }
 
+/* Header */
 .top-header {
-  background: white;
-  padding: 15px 30px;
+  background: #2b3e75;
+
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 .header-left .logo {
-  height: 50px;
+  height: 75px;
 }
 
-.header-center {
-  flex: 1;
-  max-width: 500px;
-}
-
-.search-bar {
-  display: flex;
-  align-items: center;
-  border-radius: 5px;
-  padding: 5px 20px;
-  width: 700px;
-}
-
-.search-bar i {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  color: #999;
-}
-
-.search-bar .search-icon {
-  margin-right: 8px;
-  color: #888;
-}
-
-.search-bar input {
-  width: 100%;
-  padding: 10px 15px 10px 45px;
-  border: 1px solid #ddd;
-  border-radius: 25px;
-  background: #f5f7fa;
-  font-size: 14px;
-  outline: none;
-  flex: 1;
-}
-
-.search-bar input:focus {
-  outline: none;
-  border-color: #4a5f8d;
-  background: white;
+.header-title h1 {
+  color: white;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
 
 .header-right {
@@ -491,42 +491,43 @@ export default {
   position: relative;
 }
 
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
 .user-menu {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 12px;
   cursor: pointer;
-  padding: 5px;
-  border-radius: 8px;
-  transition: background 0.2s;
+  padding: 8px 15px;
+  border-radius: 25px;
+  transition: background 0.3s;
 }
 
 .user-menu:hover {
-  background: #f5f7fa;
-}
-
-.user-info {
-  text-align: right;
-}
-
-.user-name {
-  display: block;
-  font-weight: 600;
-  color: #333;
-  font-size: 15px;
-}
-
-.user-role {
-  display: block;
-  font-size: 13px;
-  color: #666;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .user-avatar {
-  width: 45px;
-  height: 45px;
-  background: #4a5f8d;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -534,24 +535,41 @@ export default {
   font-size: 24px;
 }
 
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.user-name {
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.user-role {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+}
+
 .user-dropdown {
   position: absolute;
   top: calc(100% + 10px);
   right: 0;
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  min-width: 280px;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 250px;
   z-index: 1000;
   overflow: hidden;
 }
 
 .dropdown-header {
   padding: 20px;
+  background: #f8f9fc;
   display: flex;
   gap: 15px;
   align-items: center;
-  background: #f8f9fc;
 }
 
 .dropdown-avatar {
@@ -564,28 +582,22 @@ export default {
   justify-content: center;
   color: white;
   font-size: 26px;
-  flex-shrink: 0;
 }
 
 .dropdown-info {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  overflow: hidden;
 }
 
 .dropdown-info strong {
   color: #333;
   font-size: 15px;
-  font-weight: 600;
 }
 
 .dropdown-info span {
   color: #666;
   font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
 .dropdown-divider {
@@ -605,7 +617,6 @@ export default {
   font-size: 14px;
   color: #333;
   transition: background 0.2s;
-  text-align: left;
 }
 
 .dropdown-item:hover {
@@ -620,171 +631,193 @@ export default {
   background: #ffebee;
 }
 
-.dropdown-item i {
-  width: 20px;
-  font-size: 16px;
+/* Navigation */
+.main-nav {
+  background: #3d4f75;
+  padding: 0 30px;
 }
 
-.main-nav {
+.nav-tabs {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+
+.nav-tab {
+  padding: 15px 25px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 3px solid transparent;
+}
+
+.nav-tab:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: white;
+}
+
+.nav-tab.active {
+  background: rgba(255, 255, 255, 0.1);
+  color: white;
+  border-bottom-color: white;
+}
+
+.nav-tab-add {
+  margin-left: auto;
+  padding: 10px 15px;
+  background: #5b72a8;
+  border: none;
+  color: white;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: all 0.3s;
+}
+
+.nav-tab-add:hover {
   background: #4a5f8d;
-  padding: 0 30px;
+}
+
+/* Main Content */
+.main-content {
+  padding: 30px;
+}
+
+.content-wrapper {
+  background: white;
+  border-radius: 15px;
+  padding: 25px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+}
+
+/* Actions Bar */
+.actions-bar {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  margin-bottom: 25px;
 }
 
-.nav-menu {
-  display: flex;
-  list-style: none;
-  gap: 5px;
+.search-box {
+  position: relative;
+  width: 300px;
 }
 
-.nav-menu li {
-  padding: 15px 20px;
-  cursor: pointer;
-  color: white;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  transition: background 0.3s;
+.search-icon {
+  position: absolute;
+  left: 15px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #999;
+}
+
+.search-box input {
+  width: 100%;
+  padding: 10px 15px 10px 40px;
+  border: 1px solid #e0e0e0;
+  border-radius: 25px;
   font-size: 14px;
+  outline: none;
+  transition: all 0.3s;
 }
 
-.nav-menu li:hover {
-  background: rgba(255, 255, 255, 0.1);
+.search-box input:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
 }
 
-.nav-menu li.active {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-.nav-actions {
+.action-buttons {
   display: flex;
   gap: 10px;
 }
 
-.btn-new {
-  background: #6c88c4;
-  color: white;
-  border: none;
-  padding: 8px 20px;
-  border-radius: 5px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.btn-new:hover {
-  background: #5a76b0;
-}
-
-.btn-settings {
-  background: transparent;
-  color: white;
-  border: none;
-  width: 35px;
-  height: 35px;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 16px;
-}
-
-.btn-settings:hover {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.main-content {
-  padding: 20px 30px;
-}
-
-.content-section {
+.btn-action {
+  padding: 10px 15px;
   background: white;
-  border-radius: 10px;
-  padding: 20px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-  min-height: 500px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s;
 }
 
-.filter-section {
-  display: flex;
-  gap: 10px;
+.btn-action:hover {
+  background: #f5f5f5;
+}
+
+.btn-primary {
+  padding: 10px 25px;
+  background: #2b3e75;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.btn-primary:hover {
+  background: #1f2d54;
+}
+
+/* Table */
+.table-container {
+  overflow-x: auto;
   margin-bottom: 20px;
 }
 
-.filter-select {
-  flex: 1;
-  padding: 10px 15px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  background: #f8f9fc;
-  font-size: 14px;
-}
-
-.btn-filter {
-  padding: 10px 20px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.btn-filter:hover {
-  background: #f5f7fa;
-}
-
-.placeholder-message {
-  text-align: center;
-  padding: 100px 20px;
-  color: #999;
-  font-size: 16px;
-}
-
-.applicants-table-wrapper {
-  overflow-x: auto;
-}
-
-.applicants-table {
+.jobs-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.applicants-table thead {
-  background: #4a5f8d;
-  color: white;
+.jobs-table thead {
+  background: #2b3e75;
 }
 
-.applicants-table th {
+.jobs-table th {
   padding: 15px;
   text-align: left;
   font-weight: 600;
   font-size: 13px;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
-.applicants-table td {
+.jobs-table td {
   padding: 15px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #f0f0f0;
   font-size: 14px;
   color: #333;
 }
 
-.applicants-table tbody tr {
-  cursor: pointer;
+.jobs-table tbody tr {
   transition: background 0.2s;
 }
 
-.applicants-table tbody tr:hover {
+.jobs-table tbody tr:hover {
   background: #f8f9fc;
 }
 
+.job-title {
+  font-weight: 600;
+  color: #2b3e75;
+}
+
+.text-center {
+  text-align: center;
+}
+
 .file-link {
-  color: #4a5f8d;
+  color: #667eea;
   text-decoration: none;
+  font-weight: 500;
   display: flex;
   align-items: center;
   gap: 5px;
@@ -792,6 +825,84 @@ export default {
 
 .file-link:hover {
   text-decoration: underline;
+}
+
+.no-files {
+  color: #999;
+  font-size: 13px;
+}
+
+.status-badge {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.status-badge.green {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.yellow {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.status-badge.blue {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-badge.red {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.status-badge.small {
+  padding: 4px 10px;
+  font-size: 11px;
+}
+
+.status-badge.pending {
+  background: #fff3e0;
+  color: #f57c00;
+}
+
+.status-badge.under_review {
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-badge.shortlisted {
+  background: #f3e5f5;
+  color: #7b1fa2;
+}
+
+.status-badge.accepted {
+  background: #e8f5e9;
+  color: #2e7d32;
+}
+
+.status-badge.rejected {
+  background: #ffebee;
+  color: #c62828;
+}
+
+.btn-view {
+  padding: 8px 20px;
+  background: #4caf50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.btn-view:hover {
+  background: #45a049;
 }
 
 .no-data {
@@ -803,31 +914,50 @@ export default {
 /* Pagination */
 .pagination {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 20px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.pagination-info {
+  color: #666;
+  font-size: 14px;
+}
+
+.pagination-controls {
+  display: flex;
   gap: 5px;
-  margin-top: 20px;
 }
 
 .pagination-btn {
   padding: 8px 12px;
-  border: 1px solid #ddd;
   background: white;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
   cursor: pointer;
-  border-radius: 3px;
+  color: #333;
   font-size: 14px;
+  transition: all 0.3s;
 }
 
-.pagination-btn:hover {
-  background: #f5f7fa;
+.pagination-btn:hover:not(:disabled) {
+  background: #f5f5f5;
+  border-color: #667eea;
 }
 
 .pagination-btn.active {
-  background: #4a5f8d;
+  background: #2b3e75;
   color: white;
-  border-color: #4a5f8d;
+  border-color: #2b3e75;
 }
 
-/* Modal Styles */
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -838,29 +968,25 @@ export default {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
   padding: 20px;
 }
 
 .modal-content {
   background: white;
-  border-radius: 10px;
+  border-radius: 15px;
   width: 100%;
   max-height: 90vh;
   overflow-y: auto;
 }
 
-.csc-modal {
-  max-width: 900px;
-}
-
-.application-modal {
-  max-width: 700px;
+.applicants-modal {
+  max-width: 1200px;
 }
 
 .modal-header {
-  padding: 20px 25px;
-  border-bottom: 1px solid #eee;
+  padding: 25px 30px;
+  border-bottom: 1px solid #f0f0f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -871,235 +997,147 @@ export default {
 }
 
 .modal-header h2 {
-  color: #333;
-  font-size: 20px;
+  color: #2b3e75;
+  font-size: 22px;
+  font-weight: 700;
 }
 
 .btn-close {
-  width: 35px;
-  height: 35px;
+  width: 40px;
+  height: 40px;
   border: none;
-  background: #f5f7fa;
+  background: #f5f5f5;
   border-radius: 50%;
   cursor: pointer;
   font-size: 18px;
   color: #666;
+  transition: all 0.3s;
 }
 
 .btn-close:hover {
-  background: #e3e8ef;
+  background: #e0e0e0;
 }
 
 .modal-body {
-  padding: 25px;
+  padding: 30px;
 }
 
-/* CSC Form */
-.csc-form .form-section {
-  margin-bottom: 30px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #eee;
-}
-
-.csc-form .form-section:last-of-type {
-  border-bottom: none;
-}
-
-.csc-form .form-section h3 {
-  color: #4a5f8d;
-  margin-bottom: 20px;
-  font-size: 18px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-}
-
-.form-group {
-  margin-bottom: 15px;
-}
-
-.form-group label {
-  display: block;
-  margin-bottom: 5px;
-  color: #555;
-  font-weight: 500;
-  font-size: 14px;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
+.applicants-table {
   width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
+  border-collapse: collapse;
+}
+
+.applicants-table thead {
+  background: #f8f9fc;
+}
+
+.applicants-table th {
+  padding: 12px 15px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 13px;
+  color: #2b3e75;
+  text-transform: uppercase;
+}
+
+.applicants-table td {
+  padding: 12px 15px;
+  border-bottom: 1px solid #f0f0f0;
   font-size: 14px;
-  font-family: inherit;
 }
 
-.form-group input:focus,
-.form-group select:focus,
-.form-group textarea:focus {
-  outline: none;
-  border-color: #4a5f8d;
-}
-
-.form-actions {
+.documents-cell {
   display: flex;
-  justify-content: flex-end;
   gap: 10px;
-  margin-top: 20px;
+  align-items: center;
 }
 
-.btn-cancel {
-  padding: 10px 25px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.btn-cancel:hover {
-  background: #f5f7fa;
-}
-
-.btn-submit {
-  padding: 10px 25px;
-  background: #4a5f8d;
-  color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 14px;
-}
-
-.btn-submit:hover {
-  background: #3d4f75;
-}
-
-.btn-submit:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.error-message {
-  color: #f44336;
-  padding: 10px;
-  background: #ffebee;
-  border-radius: 5px;
-  margin-bottom: 10px;
-  font-size: 14px;
-}
-
-.success-message {
-  color: #4caf50;
-  padding: 10px;
-  background: #e8f5e9;
-  border-radius: 5px;
-  margin-bottom: 10px;
-  font-size: 14px;
-}
-
-/* Application Details */
-.applicant-details h3 {
-  color: #4a5f8d;
-  margin-bottom: 15px;
+.doc-icon {
+  width: 35px;
+  height: 35px;
+  background: #f8f9fc;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #667eea;
+  text-decoration: none;
+  transition: all 0.3s;
   font-size: 16px;
 }
 
-.info-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 15px;
-  margin-bottom: 25px;
-}
-
-.info-item {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.info-item strong {
-  color: #666;
-  font-size: 13px;
-}
-
-.info-item span {
-  color: #333;
-  font-size: 14px;
-}
-
-.documents-section,
-.cover-letter-section,
-.status-section {
-  margin-top: 25px;
-  padding-top: 20px;
-  border-top: 1px solid #eee;
-}
-
-.doc-list {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.doc-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 15px;
-  background: #f8f9fc;
-  border-radius: 5px;
-  color: #4a5f8d;
-  text-decoration: none;
-  transition: background 0.2s;
-}
-
-.doc-item:hover {
-  background: #e3e8ef;
-}
-
-.cover-letter-section p {
-  color: #555;
-  line-height: 1.6;
-  font-size: 14px;
-}
-
-.status-select {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  margin-bottom: 10px;
-  font-size: 14px;
-}
-
-.status-section textarea {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ddd;
-  border-radius: 5px;
-  font-family: inherit;
-  font-size: 14px;
-  margin-bottom: 10px;
-}
-
-.btn-update-status {
-  padding: 10px 20px;
-  background: #4a5f8d;
+.doc-icon:hover {
+  background: #667eea;
   color: white;
-  border: none;
-  border-radius: 5px;
-  cursor: pointer;
-  font-size: 14px;
+  transform: translateY(-2px);
 }
 
-.btn-update-status:hover {
-  background: #3d4f75;
+/* Placeholder */
+.placeholder {
+  text-align: center;
+  padding: 100px 20px;
+}
+
+.placeholder h2 {
+  color: #2b3e75;
+  font-size: 28px;
+  margin-bottom: 10px;
+}
+
+.placeholder p {
+  color: #666;
+  font-size: 16px;
+}
+
+/* Responsive */
+@media (max-width: 1024px) {
+  .header-title h1 {
+    font-size: 20px;
+  }
+
+  .nav-tabs {
+    overflow-x: auto;
+  }
+
+  .actions-bar {
+    flex-direction: column;
+    gap: 15px;
+    align-items: stretch;
+  }
+
+  .search-box {
+    width: 100%;
+  }
+
+  .table-container {
+    overflow-x: scroll;
+  }
+}
+
+@media (max-width: 768px) {
+  .top-header {
+    padding: 15px;
+  }
+
+  .header-left .logo {
+    height: 40px;
+  }
+
+  .user-info {
+    display: none;
+  }
+
+  .main-content {
+    padding: 15px;
+  }
+
+  .content-wrapper {
+    padding: 15px;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 15px;
+  }
 }
 </style>
