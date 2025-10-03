@@ -89,3 +89,30 @@ class EligibilityCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = EligibilityCategory
         fields = ['id', 'name', 'description', 'types']
+
+class ApplicationSubmissionSerializer(serializers.ModelSerializer):
+    """For frontend application form submission"""
+    class Meta:
+        model = Application
+        fields = ['job', 'cover_letter', 'resume', 'pds', 'certificates']
+    
+    def validate(self, attrs):
+        request = self.context.get('request')
+        job = attrs.get('job')
+        
+        # Check if user already applied
+        if Application.objects.filter(job=job, applicant=request.user).exists():
+            raise serializers.ValidationError("You have already applied for this job.")
+        
+        # Check if job is open
+        if job.status != 'open':
+            raise serializers.ValidationError("This job is no longer accepting applications.")
+        
+        return attrs
+
+
+class StatusUpdateSerializer(serializers.ModelSerializer):
+    """For HR to update status"""
+    class Meta:
+        model = Application
+        fields = ['status', 'notes']

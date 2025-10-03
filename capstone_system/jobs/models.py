@@ -7,6 +7,32 @@ from django.core.validators import FileExtensionValidator
 import os
 
 
+# File validation
+def validate_file_size(file):
+    """Validate file size - max 5MB for documents, 10MB for archives"""
+    max_size = 10 * 1024 * 1024  # 10MB
+    if file.size > max_size:
+        raise ValidationError(f'File size exceeds 10MB. Current size: {file.size / (1024*1024):.2f}MB')
+
+
+# Upload path functions
+def get_document_upload_path(instance, filename):
+    """
+    Generate upload path: applications/job_X/applicant_Y/document_type/filename
+    """
+    application = instance.application
+    job_folder = f"job_{application.job.id}_{slugify(application.job.title)}"
+    applicant_folder = f"applicant_{application.applicant.id}_{slugify(application.applicant.get_full_name())}"
+    doc_type_folder = instance.document_type
+    
+    # Clean filename
+    name, ext = os.path.splitext(filename)
+    safe_name = slugify(name)
+    safe_filename = f"{safe_name}{ext.lower()}"
+    
+    return os.path.join('applications', job_folder, applicant_folder, doc_type_folder, safe_filename)
+
+
 class Job(models.Model):
     JOB_TYPE_CHOICES = (
         ('full_time', 'Full Time'),
@@ -35,7 +61,6 @@ class Job(models.Model):
         limit_choices_to={'user_type': 'hr'}
     )
     
-    # New structured requirements
     education_levels = models.ManyToManyField(
         'EducationLevel',
         related_name='jobs',
@@ -48,7 +73,6 @@ class Job(models.Model):
     )
     
     slug = models.SlugField(unique=True, blank=True)
-
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     deadline = models.DateField(blank=True, null=True)
@@ -61,17 +85,12 @@ class Job(models.Model):
             self.status = "closed"
 
     def save(self, *args, **kwargs):
-        # Generate slug if not exists
         if not self.slug:
             self.slug = slugify(f"{self.title}-{self.id or ''}")
         
-        # Check if this is a new job
         is_new = self.pk is None
-        
-        # Save the job first
         super().save(*args, **kwargs)
         
-        # Create folder structure for new jobs
         if is_new:
             self.create_application_folder()
     
@@ -79,19 +98,6 @@ class Job(models.Model):
         """Create base folder for job applications"""
         folder_path = self.get_job_folder_path()
         os.makedirs(folder_path, exist_ok=True)
-        
-        # Create a README file in the job folder
-        readme_path = os.path.join(folder_path, 'README.txt')
-        try:
-            with open(readme_path, 'w') as f:
-                f.write(f"Job: {self.title}\n")
-                f.write(f"Job ID: {self.id}\n")
-                f.write(f"Created: {self.created_at}\n")
-                f.write(f"Deadline: {self.deadline}\n")
-                f.write(f"\nThis folder contains all applications for this job posting.\n")
-        except Exception as e:
-            print(f"Could not create README: {e}")
-        
         return folder_path
     
     def get_job_folder_path(self):
@@ -104,53 +110,17 @@ class Job(models.Model):
         folder_name = f"job_{self.id}_{slugify(self.title)}"
         return os.path.join('applications', folder_name)
     
+    @property
+    def applications_count(self):
+        return self.applications.count()
+    
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['status', '-created_at']),
+            models.Index(fields=['deadline']),
+        ]
 
-
-# ===========================================
-# Helper functions for file upload paths
-# ===========================================
-
-def get_application_upload_path(instance, filename, file_type):
-    """
-    Generate nested upload path for application files
-    Path: applications/job_{id}_{title}/applicant_{id}_{name}/{file_type}/filename
-    """
-    # Get job folder
-    job_folder = instance.job.get_job_folder_relative()
-    
-    # Create applicant folder name
-    applicant_name = slugify(f"{instance.applicant.first_name}_{instance.applicant.last_name}")
-    applicant_folder = f"applicant_{instance.applicant.id}_{applicant_name}"
-    
-    # Clean filename
-    name, ext = os.path.splitext(filename)
-    safe_name = slugify(name)
-    safe_filename = f"{safe_name}{ext.lower()}"
-    
-    # Complete path
-    return os.path.join(job_folder, applicant_folder, file_type, safe_filename)
-
-
-def resume_upload_path(instance, filename):
-    """Upload path for resume/CV files"""
-    return get_application_upload_path(instance, filename, 'resume')
-
-
-def pds_upload_path(instance, filename):
-    """Upload path for Personal Data Sheet files"""
-    return get_application_upload_path(instance, filename, 'pds')
-
-
-def certificates_upload_path(instance, filename):
-    """Upload path for certificates and supporting documents"""
-    return get_application_upload_path(instance, filename, 'certificates')
-
-
-# ===========================================
-# Application Model
-# ===========================================
 
 class Application(models.Model):
     STATUS_CHOICES = (
@@ -169,41 +139,9 @@ class Application(models.Model):
         limit_choices_to={'user_type': 'applicant'}
     )
     
-    # Personal Information
     cover_letter = models.TextField()
-    
-    # Document uploads with nested folder structure
-    resume = models.FileField(
-        upload_to=resume_upload_path,
-        validators=[FileExtensionValidator(
-            allowed_extensions=['pdf', 'doc', 'docx']
-        )],
-        help_text="Accepted formats: PDF, DOC, DOCX (Max 5MB)"
-    )
-    
-    pds = models.FileField(
-        upload_to=pds_upload_path,
-        blank=True, 
-        null=True,
-        validators=[FileExtensionValidator(
-            allowed_extensions=['pdf', 'doc', 'docx']
-        )],
-        help_text="Personal Data Sheet (Max 5MB)"
-    )
-    
-    certificates = models.FileField(
-        upload_to=certificates_upload_path,
-        blank=True, 
-        null=True,
-        validators=[FileExtensionValidator(
-            allowed_extensions=['pdf', 'zip', 'rar']
-        )],
-        help_text="Certificates (PDF or ZIP/RAR archive, Max 10MB)"
-    )
-    
-    # Application status
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    notes = models.TextField(blank=True, null=True)  # HR notes
+    notes = models.TextField(blank=True, null=True)
     
     applied_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -212,7 +150,6 @@ class Application(models.Model):
         return f"{self.applicant.username} - {self.job.title}"
     
     def save(self, *args, **kwargs):
-        """Create applicant folder structure when application is created"""
         is_new = not self.pk
         
         if is_new:
@@ -222,84 +159,101 @@ class Application(models.Model):
                 self.job.create_application_folder()
             
             # Create applicant folder structure
-            applicant_name = slugify(
-                f"{self.applicant.first_name}_{self.applicant.last_name}"
-            )
+            applicant_name = slugify(f"{self.applicant.first_name}_{self.applicant.last_name}")
             applicant_folder = os.path.join(
                 job_folder,
                 f"applicant_{self.applicant.id}_{applicant_name}"
             )
             
-            # Create subfolders for each document type
-            for doc_type in ['resume', 'pds', 'certificates']:
-                doc_folder = os.path.join(applicant_folder, doc_type)
-                os.makedirs(doc_folder, exist_ok=True)
-            
-            # Create applicant info file
-            info_path = os.path.join(applicant_folder, 'applicant_info.txt')
-            try:
-                with open(info_path, 'w') as f:
-                    f.write(f"Applicant: {self.applicant.first_name} {self.applicant.last_name}\n")
-                    f.write(f"Email: {self.applicant.email}\n")
-                    f.write(f"Applied: {timezone.now()}\n")
-            except Exception as e:
-                print(f"Could not create applicant info: {e}")
+            # Create document type folders
+            doc_types = ['pds', 'graduation_cert', 'eligibility_cert', 'training_cert', 'other']
+            for doc_type in doc_types:
+                os.makedirs(os.path.join(applicant_folder, doc_type), exist_ok=True)
         
         super().save(*args, **kwargs)
     
-    def delete(self, *args, **kwargs):
-        """Clean up files when application is deleted"""
-        # Delete files
-        if self.resume:
-            self.resume.delete(save=False)
-        if self.pds:
-            self.pds.delete(save=False)
-        if self.certificates:
-            self.certificates.delete(save=False)
-        
-        super().delete(*args, **kwargs)
-    
-    def get_applicant_folder_path(self):
-        """Get the full path to the applicant's folder"""
-        job_folder = self.job.get_job_folder_path()
-        applicant_name = slugify(
-            f"{self.applicant.first_name}_{self.applicant.last_name}"
-        )
-        return os.path.join(
-            job_folder,
-            f"applicant_{self.applicant.id}_{applicant_name}"
-        )
-    
     @property
-    def has_all_documents(self):
-        """Check if all required documents are uploaded"""
-        return bool(self.resume)  # Only resume is required based on your model
+    def has_pds(self):
+        return self.documents.filter(document_type='pds').exists()
     
     @property
     def documents_count(self):
-        """Count how many documents have been uploaded"""
-        count = 0
-        if self.resume:
-            count += 1
-        if self.pds:
-            count += 1
-        if self.certificates:
-            count += 1
-        return count
+        return self.documents.count()
     
     class Meta:
         ordering = ['-applied_at']
         unique_together = ['job', 'applicant']
+        indexes = [
+            models.Index(fields=['job', 'status']),
+            models.Index(fields=['applicant', '-applied_at']),
+        ]
 
 
-# =====================
+class ApplicationDocument(models.Model):
+    """Unified document storage - handles all document types"""
+    
+    DOCUMENT_TYPES = [
+        ('pds', 'PDS - Personal Data Sheet (For OCR)'),
+        ('graduation_cert', 'Graduation Certificate'),
+        ('eligibility_cert', 'Eligibility Certificate'),
+        ('training_cert', 'Training Certificate'),
+        ('resume', 'Resume/CV'),
+        ('other', 'Other Supporting Document'),
+    ]
+    
+    application = models.ForeignKey(
+        Application, 
+        on_delete=models.CASCADE, 
+        related_name='documents'
+    )
+    document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES)
+    document_name = models.CharField(max_length=255)
+    file = models.FileField(
+        upload_to=get_document_upload_path,
+        validators=[validate_file_size]
+    )
+    
+    # OCR-specific fields (only used for PDS documents)
+    ocr_processed = models.BooleanField(default=False)
+    ocr_data = models.JSONField(null=True, blank=True)
+    ocr_confidence = models.FloatField(null=True, blank=True)
+    ocr_error = models.TextField(null=True, blank=True)
+    
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    file_size = models.IntegerField(default=0)  # Store in bytes
+    
+    def __str__(self):
+        return f"{self.get_document_type_display()} - {self.document_name}"
+    
+    def save(self, *args, **kwargs):
+        if self.file:
+            self.file_size = self.file.size
+            if not self.document_name:
+                self.document_name = self.file.name
+        super().save(*args, **kwargs)
+    
+    def delete(self, *args, **kwargs):
+        # Delete the file when the record is deleted
+        if self.file:
+            self.file.delete(save=False)
+        super().delete(*args, **kwargs)
+    
+    @property
+    def file_size_mb(self):
+        return round(self.file_size / (1024 * 1024), 2)
+    
+    class Meta:
+        ordering = ['document_type', '-uploaded_at']
+        indexes = [
+            models.Index(fields=['application', 'document_type']),
+            models.Index(fields=['document_type', 'ocr_processed']),
+        ]
+
+
 # Education Models
-# =====================
-
 class EducationCategory(models.Model):
-    """Categories for grouping education levels"""
     name = models.CharField(max_length=200, unique=True)
-    icon = models.CharField(max_length=50, blank=True)  # For UI icons
+    icon = models.CharField(max_length=50, blank=True)
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     
@@ -312,7 +266,6 @@ class EducationCategory(models.Model):
 
 
 class EducationLevel(models.Model):
-    """Specific degree programs"""
     category = models.ForeignKey(
         EducationCategory, 
         on_delete=models.CASCADE, 
@@ -330,12 +283,8 @@ class EducationLevel(models.Model):
         return self.name
 
 
-# =====================
 # Eligibility Models
-# =====================
-
 class EligibilityCategory(models.Model):
-    """Categories for eligibility types"""
     name = models.CharField(max_length=200, unique=True)
     description = models.TextField(blank=True)
     order = models.IntegerField(default=0)
@@ -350,14 +299,13 @@ class EligibilityCategory(models.Model):
 
 
 class EligibilityType(models.Model):
-    """Specific eligibility requirements"""
     category = models.ForeignKey(
         EligibilityCategory, 
         on_delete=models.CASCADE, 
         related_name='types'
     )
     name = models.CharField(max_length=200, unique=True)
-    code = models.CharField(max_length=50, blank=True)  # e.g., "RA 1080"
+    code = models.CharField(max_length=50, blank=True)
     description = models.TextField(blank=True)
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)

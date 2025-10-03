@@ -1,5 +1,7 @@
 from rest_framework import status, generics, permissions
 from rest_framework.response import Response
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework import permissions
 from .models import Job, Application
@@ -189,3 +191,42 @@ class EligibilityOptionsView(APIView):
         categories = EligibilityCategory.objects.filter(is_active=True).prefetch_related('types')
         serializer = EligibilityCategorySerializer(categories, many=True)
         return Response(serializer.data)
+    
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_application_simple(request):
+    """Simple application submission endpoint"""
+    try:
+        # Check user type
+        if request.user.user_type != 'applicant':
+            return Response({'error': 'Only applicants can apply'}, status=403)
+        
+        # Get data
+        job_id = request.data.get('job')
+        cover_letter = request.data.get('cover_letter')
+        
+        # Check if already applied
+        if Application.objects.filter(job_id=job_id, applicant=request.user).exists():
+            return Response({'error': 'Already applied'}, status=400)
+        
+        # Create application
+        application = Application.objects.create(
+            job_id=job_id,
+            applicant=request.user,
+            cover_letter=cover_letter,
+            resume=request.FILES.get('pds_file'),  # Using pds_file as resume
+            pds=request.FILES.get('graduation_cert'),
+            certificates=request.FILES.get('eligibility_cert')
+        )
+        
+        return Response({
+            'success': True,
+            'message': 'Application submitted',
+            'application': {
+                'id': application.id,
+                'status': application.status
+            }
+        }, status=201)
+        
+    except Exception as e:
+        return Response({'error': str(e)}, status=400)
