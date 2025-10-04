@@ -16,7 +16,7 @@ import ViewApplications from "../views/HRPanel/ViewApplications.vue";
 
 // Applicant Views
 import ApplicantDashboard from "../views/ApplicantDashboard.vue";
-import ApplyJob from "../views/ApplicantPanel/ApplyJob.vue";
+import ApplicationForm from "@/views/ApplicantPanel/ApplicationForm.vue";
 import MyApplications from "../views/ApplicantPanel/MyApplications.vue";
 
 const routes = [
@@ -89,9 +89,9 @@ const routes = [
     meta: { requiresAuth: true, role: "applicant" },
   },
   {
-    path: "/applicant/apply/:jobId",
-    name: "ApplyJob",
-    component: ApplyJob,
+    path: "/applicant/application-form/:jobId",
+    name: "ApplyForm",
+    component: ApplicationForm,
     meta: { requiresAuth: true, role: "applicant" },
   },
   {

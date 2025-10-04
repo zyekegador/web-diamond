@@ -56,8 +56,18 @@ export default {
     return api.post("/accounts/register/applicant/", data);
   },
 
-  logout() {
-    return api.post("/accounts/logout/");
+  async logout() {
+    try {
+      await api.post("/accounts/logout/");
+    } catch (error) {
+      // Ignore errors - if token is already invalid, that's fine
+      console.log("Logout API call failed, but clearing local session");
+    } finally {
+      // Always clear local storage regardless of API response
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      localStorage.removeItem("userType");
+    }
   },
 
   getCurrentUser() {
@@ -132,5 +142,13 @@ export default {
 
   getEligibilityOptions() {
     return api.get("/options/eligibility/");
+  },
+
+  submitApplication(formData) {
+    return api.post("/jobs/apply-simple/", formData, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    });
   },
 };

@@ -116,11 +116,8 @@ export default {
     handleJobCreated() {
       this.loadJobs();
     },
-    handleLogout() {
-      api.logout();
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("userType");
+    async handleLogout() {
+      await api.logout();
       this.$router.push("/");
     },
     formatDate(dateString) {

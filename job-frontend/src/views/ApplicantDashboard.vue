@@ -147,7 +147,7 @@
                 <span class="job-date"
                   >Posted {{ formatDate(job.created_at) }}</span
                 >
-                <button @click="viewJobDetail(job.id)" class="btn-apply">
+                <button @click="openApplicationForm(job)" class="btn-apply">
                   Apply Now
                 </button>
               </div>
@@ -238,20 +238,35 @@
         </div>
       </main>
     </div>
+
+    <!-- Application Form Modal -->
+    <ApplicationForm
+      v-if="showApplicationForm"
+      :jobId="selectedJob.id"
+      :jobTitle="selectedJob.title"
+      @close="closeApplicationForm"
+      @application-submitted="handleApplicationSubmitted"
+    />
   </div>
 </template>
 
 <script>
 import api from "@/services/api";
+import ApplicationForm from "./ApplicantPanel/ApplicationForm.vue";
 
 export default {
   name: "ApplicantDashboard",
+  components: {
+    ApplicationForm,
+  },
   data() {
     return {
       user: JSON.parse(localStorage.getItem("user") || "{}"),
       activeTab: "overview",
       applications: [],
       availableJobs: [],
+      showApplicationForm: false,
+      selectedJob: null,
     };
   },
   computed: {
@@ -288,18 +303,24 @@ export default {
         console.error("Error loading jobs:", error);
       }
     },
-    viewJobDetail(jobId) {
-      this.$router.push(`/applicant/apply/${jobId}`);
+    openApplicationForm(job) {
+      this.selectedJob = job;
+      this.showApplicationForm = true;
+    },
+    closeApplicationForm() {
+      this.showApplicationForm = false;
+      this.selectedJob = null;
+    },
+    handleApplicationSubmitted() {
+      this.closeApplicationForm();
+      this.loadApplications(); // Refresh applications list
+      this.activeTab = "my-applications"; // Switch to applications tab
     },
     viewApplication(appId) {
-      // For now, just show alert. You can create a detail view later
       alert("View application details - Feature coming soon!");
     },
-    handleLogout() {
-      api.logout();
-      localStorage.removeItem("token");
-      localStorage.removeItem("user");
-      localStorage.removeItem("userType");
+    async handleLogout() {
+      await api.logout();
       this.$router.push("/");
     },
     formatDate(dateString) {
