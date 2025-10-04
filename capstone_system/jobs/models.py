@@ -9,7 +9,7 @@ import os
 
 # File validation
 def validate_file_size(file):
-    """Validate file size - max 5MB for documents, 10MB for archives"""
+    """Validate file size - max 10MB"""
     max_size = 10 * 1024 * 1024  # 10MB
     if file.size > max_size:
         raise ValidationError(f'File size exceeds 10MB. Current size: {file.size / (1024*1024):.2f}MB')
@@ -35,10 +35,10 @@ def get_document_upload_path(instance, filename):
 
 class Job(models.Model):
     JOB_TYPE_CHOICES = (
-        ('full_time', 'Full Time'),
-        ('part_time', 'Part Time'),
-        ('contract', 'Contract'),
-        ('internship', 'Internship'),
+        ('permanent', 'Permanent'),
+        ('casual', 'Casual'),
+        ('contractual', 'Contractual'),
+        ('coterminous', 'Coterminous'),
     )
     
     STATUS_CHOICES = (
@@ -46,14 +46,26 @@ class Job(models.Model):
         ('closed', 'Closed'),
     )
     
-    title = models.CharField(max_length=200)
+    # Basic Information
+    title = models.CharField(max_length=200, verbose_name="Position Title")
+    place_of_assignment = models.CharField(max_length=300)
+    plantilla_item_no = models.CharField(max_length=50, blank=True)
+    salary_job_grade = models.CharField(max_length=10, blank=True)
+    monthly_salary = models.DecimalField(max_digits=10, decimal_places=2)
+    
+    # Job Details
     description = models.TextField()
-    requirements = models.TextField()
-    job_type = models.CharField(max_length=20, choices=JOB_TYPE_CHOICES)
-    location = models.CharField(max_length=200)
-    salary_range = models.CharField(max_length=100, blank=True, null=True)
+    job_type = models.CharField(max_length=20, choices=JOB_TYPE_CHOICES, default='permanent')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
     
+    # Requirements
+    education_requirement = models.TextField(help_text="e.g., Bachelor's Degree relevant to the job")
+    training_requirement = models.CharField(max_length=200, help_text="e.g., 16 hours of relevant training")
+    experience_requirement = models.CharField(max_length=200, help_text="e.g., 3 years of relevant experience")
+    eligibility_requirement = models.TextField(help_text="e.g., Career Service Professional / Second Level Eligibility OR Board License")
+    competency_requirement = models.TextField(blank=True, help_text="Optional preferred qualifications")
+    
+    # Relations
     posted_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, 
         on_delete=models.CASCADE, 
@@ -69,13 +81,15 @@ class Job(models.Model):
     eligibility_types = models.ManyToManyField(
         'EligibilityType',
         related_name='jobs',
-        blank=True
+        blank=True,
+        help_text="Can include Civil Service AND/OR Board Licenses"
     )
     
+    # Metadata
     slug = models.SlugField(unique=True, blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True, verbose_name="Posting Date")
     updated_at = models.DateTimeField(auto_now=True)
-    deadline = models.DateField(blank=True, null=True)
+    deadline = models.DateField(verbose_name="Closing Date")
     
     def __str__(self):
         return self.title
@@ -105,14 +119,13 @@ class Job(models.Model):
         folder_name = f"job_{self.id}_{slugify(self.title)}"
         return os.path.join(settings.MEDIA_ROOT, 'applications', folder_name)
     
-    def get_job_folder_relative(self):
-        """Get relative path for URLs"""
-        folder_name = f"job_{self.id}_{slugify(self.title)}"
-        return os.path.join('applications', folder_name)
-    
     @property
     def applications_count(self):
         return self.applications.count()
+    
+    @property
+    def is_open(self):
+        return self.status == 'open' and self.deadline >= timezone.now().date()
     
     class Meta:
         ordering = ['-created_at']
@@ -139,9 +152,27 @@ class Application(models.Model):
         limit_choices_to={'user_type': 'applicant'}
     )
     
-    cover_letter = models.TextField()
+    # Letter of Intent
+    letter_of_intent = models.TextField(
+        help_text="Indicate position, item number, and place of assignment"
+    )
+    
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    notes = models.TextField(blank=True, null=True)
+    notes = models.TextField(blank=True, null=True, help_text="HR notes")
+    
+    # Automated screening results
+    screening_score = models.IntegerField(null=True, blank=True, help_text="Automated screening score 0-100")
+    screening_result = models.CharField(
+        max_length=50, 
+        null=True, 
+        blank=True,
+        choices=[
+            ('highly_qualified', 'Highly Qualified'),
+            ('qualified', 'Qualified'),
+            ('not_qualified', 'Not Qualified'),
+        ]
+    )
+    screening_details = models.JSONField(null=True, blank=True, help_text="Detailed screening breakdown")
     
     applied_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -165,16 +196,30 @@ class Application(models.Model):
                 f"applicant_{self.applicant.id}_{applicant_name}"
             )
             
-            # Create document type folders
-            doc_types = ['pds', 'graduation_cert', 'eligibility_cert', 'training_cert', 'other']
+            # Create document type folders matching CSC requirements
+            doc_types = [
+                'letter_of_intent',
+                'pds',
+                'wes',
+                'performance_rating',
+                'eligibility_license',
+                'transcript',
+                'training_certificates',
+                'other'
+            ]
             for doc_type in doc_types:
                 os.makedirs(os.path.join(applicant_folder, doc_type), exist_ok=True)
         
         super().save(*args, **kwargs)
     
     @property
-    def has_pds(self):
-        return self.documents.filter(document_type='pds').exists()
+    def has_required_documents(self):
+        """Check if all required documents are uploaded"""
+        required_docs = ['pds', 'wes', 'eligibility_license', 'transcript']
+        return all(
+            self.documents.filter(document_type=doc_type).exists() 
+            for doc_type in required_docs
+        )
     
     @property
     def documents_count(self):
@@ -186,19 +231,22 @@ class Application(models.Model):
         indexes = [
             models.Index(fields=['job', 'status']),
             models.Index(fields=['applicant', '-applied_at']),
+            models.Index(fields=['screening_result']),
         ]
 
 
 class ApplicationDocument(models.Model):
-    """Unified document storage - handles all document types"""
+    """Document storage matching CSC requirements"""
     
     DOCUMENT_TYPES = [
-        ('pds', 'PDS - Personal Data Sheet (For OCR)'),
-        ('graduation_cert', 'Graduation Certificate'),
-        ('eligibility_cert', 'Eligibility Certificate'),
-        ('training_cert', 'Training Certificate'),
-        ('resume', 'Resume/CV'),
-        ('other', 'Other Supporting Document'),
+        ('letter_of_intent', 'Letter of Intent'),
+        ('pds', 'Personal Data Sheet (CS Form 212)'),
+        ('wes', 'Work Experience Sheet'),
+        ('performance_rating', 'Performance Rating (if applicable)'),
+        ('eligibility_license', 'Eligibility Certificate / Board License'),
+        ('transcript', 'Transcript of Records'),
+        ('training_certificates', 'Training Certificates'),
+        ('other', 'Other Supporting Documents'),
     ]
     
     application = models.ForeignKey(
@@ -206,21 +254,24 @@ class ApplicationDocument(models.Model):
         on_delete=models.CASCADE, 
         related_name='documents'
     )
-    document_type = models.CharField(max_length=20, choices=DOCUMENT_TYPES)
+    document_type = models.CharField(max_length=30, choices=DOCUMENT_TYPES)
     document_name = models.CharField(max_length=255)
     file = models.FileField(
         upload_to=get_document_upload_path,
-        validators=[validate_file_size]
+        validators=[
+            validate_file_size,
+            FileExtensionValidator(allowed_extensions=['pdf', 'jpg', 'jpeg', 'png'])
+        ]
     )
     
-    # OCR-specific fields (only used for PDS documents)
+    # OCR-specific fields (for PDS, WES, Eligibility/License, Transcript)
     ocr_processed = models.BooleanField(default=False)
     ocr_data = models.JSONField(null=True, blank=True)
     ocr_confidence = models.FloatField(null=True, blank=True)
     ocr_error = models.TextField(null=True, blank=True)
     
     uploaded_at = models.DateTimeField(auto_now_add=True)
-    file_size = models.IntegerField(default=0)  # Store in bytes
+    file_size = models.IntegerField(default=0)
     
     def __str__(self):
         return f"{self.get_document_type_display()} - {self.document_name}"
@@ -233,7 +284,6 @@ class ApplicationDocument(models.Model):
         super().save(*args, **kwargs)
     
     def delete(self, *args, **kwargs):
-        # Delete the file when the record is deleted
         if self.file:
             self.file.delete(save=False)
         super().delete(*args, **kwargs)
@@ -241,6 +291,11 @@ class ApplicationDocument(models.Model):
     @property
     def file_size_mb(self):
         return round(self.file_size / (1024 * 1024), 2)
+    
+    @property
+    def requires_ocr(self):
+        """Documents that should be processed with OCR"""
+        return self.document_type in ['pds', 'wes', 'eligibility_license', 'transcript']
     
     class Meta:
         ordering = ['document_type', '-uploaded_at']
@@ -285,10 +340,15 @@ class EducationLevel(models.Model):
 
 # Eligibility Models
 class EligibilityCategory(models.Model):
+    """Categories: Civil Service Eligibility, Professional Board Licenses, etc."""
     name = models.CharField(max_length=200, unique=True)
     description = models.TextField(blank=True)
     order = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
+    is_board_license = models.BooleanField(
+        default=False, 
+        help_text="True for PRC Board Licenses, False for Civil Service"
+    )
     
     class Meta:
         ordering = ['order', 'name']
@@ -299,6 +359,7 @@ class EligibilityCategory(models.Model):
 
 
 class EligibilityType(models.Model):
+    """Specific eligibility types: CSC Professional, PRC Engineer, etc."""
     category = models.ForeignKey(
         EligibilityCategory, 
         on_delete=models.CASCADE, 
