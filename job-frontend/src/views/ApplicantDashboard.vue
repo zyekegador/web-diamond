@@ -17,28 +17,28 @@
             :class="{ active: activeTab === 'overview' }"
             @click="activeTab = 'overview'"
           >
-            <i class="fas fa-chart-line"></i>
+            <font-awesome-icon :icon="['fas', 'chart-line']" />
             <span>Overview</span>
           </li>
           <li
             :class="{ active: activeTab === 'browse-jobs' }"
             @click="activeTab = 'browse-jobs'"
           >
-            <i class="fas fa-search"></i>
+            <font-awesome-icon :icon="['fas', 'search']" />
             <span>Browse Jobs</span>
           </li>
           <li
             :class="{ active: activeTab === 'my-applications' }"
             @click="activeTab = 'my-applications'"
           >
-            <i class="fas fa-file-alt"></i>
+            <font-awesome-icon :icon="['fas', 'file-alt']" />
             <span>My Applications</span>
           </li>
           <li
             :class="{ active: activeTab === 'profile' }"
             @click="activeTab = 'profile'"
           >
-            <i class="fas fa-user"></i>
+            <font-awesome-icon :icon="['fas', 'user']" />
             <span>Profile</span>
           </li>
         </ul>
@@ -51,7 +51,7 @@
           <div class="stats-grid">
             <div class="stat-card">
               <div class="stat-icon blue">
-                <i class="fas fa-file-alt"></i>
+                <font-awesome-icon :icon="['fas', 'file-alt']" />
               </div>
               <div class="stat-info">
                 <h3>Total Applications</h3>
@@ -61,7 +61,7 @@
 
             <div class="stat-card">
               <div class="stat-icon orange">
-                <i class="fas fa-clock"></i>
+                <font-awesome-icon :icon="['fas', 'clock']" />
               </div>
               <div class="stat-info">
                 <h3>Pending</h3>
@@ -71,7 +71,7 @@
 
             <div class="stat-card">
               <div class="stat-icon green">
-                <i class="fas fa-check-circle"></i>
+                <font-awesome-icon :icon="['fas', 'check-circle']" />
               </div>
               <div class="stat-info">
                 <h3>Shortlisted</h3>
@@ -81,7 +81,7 @@
 
             <div class="stat-card">
               <div class="stat-icon purple">
-                <i class="fas fa-star"></i>
+                <font-awesome-icon :icon="['fas', 'star']" />
               </div>
               <div class="stat-info">
                 <h3>Accepted</h3>
@@ -105,17 +105,19 @@
                   }}</span>
                 </div>
                 <p class="app-details">
-                  <i class="fas fa-building"></i> {{ app.job.location }}
+                  <font-awesome-icon :icon="['fas', 'building']" />
+                  {{ app.job.location }}
                   <span class="separator">|</span>
-                  <i class="fas fa-calendar"></i> Applied
+                  <font-awesome-icon :icon="['fas', 'calendar']" /> Applied
                   {{ formatDate(app.applied_at) }}
                 </p>
                 <p v-if="app.notes" class="app-notes">
-                  <i class="fas fa-comment"></i> HR Notes: {{ app.notes }}
+                  <font-awesome-icon :icon="['fas', 'comment']" /> HR Notes:
+                  {{ app.notes }}
                 </p>
               </div>
               <div v-if="applications.length === 0" class="no-data">
-                <i class="fas fa-inbox"></i>
+                <font-awesome-icon :icon="['fas', 'inbox']" />
                 <p>No applications yet. Start browsing jobs!</p>
                 <button @click="activeTab = 'browse-jobs'" class="btn-primary">
                   Browse Jobs
@@ -129,32 +131,171 @@
         <div v-if="activeTab === 'browse-jobs'" class="content-section">
           <h1>Browse Available Jobs</h1>
           <div class="jobs-grid">
-            <div v-for="job in availableJobs" :key="job.id" class="job-card">
+            <div
+              v-for="job in openJobs"
+              :key="job.id"
+              class="job-card"
+              :class="{ expanded: expandedJobId === job.id }"
+            >
               <div class="job-header">
                 <h3>{{ job.title }}</h3>
                 <span class="job-type">{{ formatJobType(job.job_type) }}</span>
               </div>
-              <p class="job-location">
-                <i class="fas fa-map-marker-alt"></i> {{ job.location }}
-              </p>
-              <p class="job-salary" v-if="job.salary_range">
-                <i class="fas fa-money-bill-wave"></i> {{ job.salary_range }}
-              </p>
-              <p class="job-description">
-                {{ truncateText(job.description, 100) }}
-              </p>
+
+              <!-- Basic Info (Always Visible) -->
+              <div class="job-basic-info">
+                <p class="job-location">
+                  <font-awesome-icon :icon="['fas', 'map-marker-alt']" />
+                  {{ job.place_of_assignment || job.location }}
+                </p>
+                <p class="job-salary">
+                  <font-awesome-icon :icon="['fas', 'money-bill-wave']" /> PHP
+                  {{ formatSalary(job.monthly_salary || job.salary_range) }}
+                </p>
+                <p class="job-education">
+                  {{ truncateText(job.education_requirement, 100) }}
+                </p>
+              </div>
+
+              <!-- Detailed Info (Shown when expanded) -->
+              <div v-if="expandedJobId === job.id" class="job-details">
+                <div class="detail-section">
+                  <h4>
+                    <font-awesome-icon :icon="['fas', 'info-circle']" />
+                    Position Details
+                  </h4>
+                  <div class="detail-grid">
+                    <div class="detail-item" v-if="job.plantilla_item_no">
+                      <span class="detail-label">Plantilla Item No:</span>
+                      <span class="detail-value">{{
+                        job.plantilla_item_no
+                      }}</span>
+                    </div>
+                    <div class="detail-item" v-if="job.salary_job_grade">
+                      <span class="detail-label">Salary/Job Grade:</span>
+                      <span class="detail-value">{{
+                        job.salary_job_grade
+                      }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label">Monthly Salary:</span>
+                      <span class="detail-value"
+                        >PHP
+                        {{
+                          formatSalary(job.monthly_salary || job.salary_range)
+                        }}</span
+                      >
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label">Employment Type:</span>
+                      <span class="detail-value">{{
+                        formatJobType(job.job_type)
+                      }}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="detail-section">
+                  <h4>
+                    <font-awesome-icon :icon="['fas', 'graduation-cap']" />
+                    Qualifications
+                  </h4>
+                  <div class="qualification-item">
+                    <span class="qual-label">Education:</span>
+                    <span class="qual-value">{{
+                      job.education_requirement || "Not specified"
+                    }}</span>
+                  </div>
+                  <div class="qualification-item">
+                    <span class="qual-label">Eligibility:</span>
+                    <span class="qual-value">{{
+                      job.eligibility_requirement || "Not specified"
+                    }}</span>
+                  </div>
+                  <div class="qualification-item">
+                    <span class="qual-label">Training:</span>
+                    <span class="qual-value">{{
+                      job.training_requirement || "None Required"
+                    }}</span>
+                  </div>
+                  <div class="qualification-item">
+                    <span class="qual-label">Work Experience:</span>
+                    <span class="qual-value">{{
+                      job.experience_requirement || "None Required"
+                    }}</span>
+                  </div>
+                </div>
+
+                <div class="detail-section">
+                  <h4>
+                    <font-awesome-icon :icon="['fas', 'clipboard-list']" /> Job
+                    Description
+                  </h4>
+                  <p class="full-description">{{ job.description }}</p>
+                </div>
+
+                <div class="detail-section" v-if="job.competency_requirement">
+                  <h4>
+                    <font-awesome-icon :icon="['fas', 'tasks']" /> Competency
+                    Requirements
+                  </h4>
+                  <p class="full-description">
+                    {{ job.competency_requirement }}
+                  </p>
+                </div>
+
+                <div class="detail-section">
+                  <h4>
+                    <font-awesome-icon :icon="['fas', 'calendar-alt']" />
+                    Important Dates
+                  </h4>
+                  <div class="detail-grid">
+                    <div class="detail-item">
+                      <span class="detail-label">Posted:</span>
+                      <span class="detail-value">{{
+                        formatDate(job.created_at)
+                      }}</span>
+                    </div>
+                    <div class="detail-item">
+                      <span class="detail-label">Deadline:</span>
+                      <span class="detail-value deadline">{{
+                        formatDate(job.deadline)
+                      }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div class="job-footer">
-                <span class="job-date"
-                  >Posted {{ formatDate(job.created_at) }}</span
+                <button @click="toggleJobDetails(job.id)" class="btn-details">
+                  <font-awesome-icon
+                    :icon="[
+                      'fas',
+                      expandedJobId === job.id ? 'chevron-up' : 'chevron-down',
+                    ]"
+                  />
+                  {{
+                    expandedJobId === job.id ? "Hide Details" : "View Details"
+                  }}
+                </button>
+                <button
+                  @click="openApplicationForm(job)"
+                  class="btn-apply"
+                  :disabled="hasAppliedToJob(job.id)"
+                  :class="{ 'already-applied': hasAppliedToJob(job.id) }"
                 >
-                <button @click="openApplicationForm(job)" class="btn-apply">
-                  Apply Now
+                  <font-awesome-icon :icon="['fas', 'paper-plane']" />
+                  {{
+                    hasAppliedToJob(job.id) ? "Already Applied" : "Apply Now"
+                  }}
                 </button>
               </div>
             </div>
           </div>
-          <div v-if="availableJobs.length === 0" class="no-data">
-            No jobs available at the moment.
+          <div v-if="openJobs.length === 0" class="no-data">
+            <font-awesome-icon :icon="['fas', 'briefcase']" />
+            <p>No open positions available at the moment.</p>
+            <p class="sub-text">Check back later for new opportunities!</p>
           </div>
         </div>
 
@@ -191,7 +332,7 @@
                       @click="viewApplication(app.id)"
                       class="btn-action view"
                     >
-                      <i class="fas fa-eye"></i> View
+                      <font-awesome-icon :icon="['fas', 'eye']" /> View
                     </button>
                   </td>
                 </tr>
@@ -210,26 +351,26 @@
             <div class="profile-card">
               <div class="profile-header">
                 <div class="profile-avatar">
-                  <i class="fas fa-user-circle"></i>
+                  <font-awesome-icon :icon="['fas', 'user-circle']" />
                 </div>
                 <h2>{{ user.first_name }} {{ user.last_name }}</h2>
                 <p>@{{ user.username }}</p>
               </div>
               <div class="profile-details">
                 <div class="detail-item">
-                  <i class="fas fa-envelope"></i>
+                  <font-awesome-icon :icon="['fas', 'envelope']" />
                   <span>{{ user.email }}</span>
                 </div>
                 <div class="detail-item" v-if="user.phone_number">
-                  <i class="fas fa-phone"></i>
+                  <font-awesome-icon :icon="['fas', 'phone']" />
                   <span>{{ user.phone_number }}</span>
                 </div>
                 <div class="detail-item" v-if="user.date_of_birth">
-                  <i class="fas fa-birthday-cake"></i>
+                  <font-awesome-icon :icon="['fas', 'birthday-cake']" />
                   <span>{{ user.date_of_birth }}</span>
                 </div>
                 <div class="detail-item" v-if="user.address">
-                  <i class="fas fa-map-marker-alt"></i>
+                  <font-awesome-icon :icon="['fas', 'map-marker-alt']" />
                   <span>{{ user.address }}</span>
                 </div>
               </div>
@@ -267,6 +408,7 @@ export default {
       availableJobs: [],
       showApplicationForm: false,
       selectedJob: null,
+      expandedJobId: null,
     };
   },
   computed: {
@@ -280,6 +422,16 @@ export default {
     getAcceptedCount() {
       return this.applications.filter((app) => app.status === "accepted")
         .length;
+    },
+    // Filter to show only open jobs
+    openJobs() {
+      return this.availableJobs.filter((job) => job.is_open !== false);
+    },
+    // Check if user applied to a specific job
+    hasAppliedToJob() {
+      return (jobId) => {
+        return this.applications.some((app) => app.job.id === jobId);
+      };
     },
   },
   mounted() {
@@ -304,6 +456,16 @@ export default {
       }
     },
     openApplicationForm(job) {
+      // Check if user already applied for this job
+      const alreadyApplied = this.applications.some(
+        (app) => app.job.id === job.id
+      );
+
+      if (alreadyApplied) {
+        alert("You have already submitted an application for this position.");
+        return;
+      }
+
       this.selectedJob = job;
       this.showApplicationForm = true;
     },
@@ -313,8 +475,8 @@ export default {
     },
     handleApplicationSubmitted() {
       this.closeApplicationForm();
-      this.loadApplications(); // Refresh applications list
-      this.activeTab = "my-applications"; // Switch to applications tab
+      this.loadApplications();
+      this.activeTab = "my-applications";
     },
     viewApplication(appId) {
       alert("View application details - Feature coming soon!");
@@ -338,6 +500,20 @@ export default {
     },
     truncateText(text, length) {
       return text.length > length ? text.substring(0, length) + "..." : text;
+    },
+    toggleJobDetails(jobId) {
+      this.expandedJobId = this.expandedJobId === jobId ? null : jobId;
+    },
+    formatSalary(salary) {
+      if (!salary) return "Not specified";
+      const num =
+        typeof salary === "string"
+          ? parseFloat(salary.replace(/[^\d.]/g, ""))
+          : salary;
+      return num.toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
     },
   },
 };
@@ -417,7 +593,7 @@ export default {
   border-right: 4px solid #45a049;
 }
 
-.sidebar-menu li i {
+.sidebar-menu li svg {
   font-size: 18px;
   width: 20px;
 }
@@ -557,7 +733,7 @@ export default {
   margin: 5px 0;
 }
 
-.app-details i {
+.app-details svg {
   color: #4caf50;
   margin-right: 5px;
 }
@@ -587,12 +763,17 @@ export default {
   padding: 25px;
   border-radius: 10px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  transition: transform 0.3s;
+  transition: all 0.3s ease;
 }
 
 .job-card:hover {
   transform: translateY(-5px);
   box-shadow: 0 5px 20px rgba(0, 0, 0, 0.15);
+}
+
+.job-card.expanded {
+  grid-column: 1 / -1;
+  max-width: 100%;
 }
 
 .job-header {
@@ -624,13 +805,13 @@ export default {
   margin: 8px 0;
 }
 
-.job-location i,
-.job-salary i {
+.job-location svg,
+.job-salary svg {
   color: #4caf50;
   margin-right: 8px;
 }
 
-.job-description {
+.job-education {
   color: #666;
   font-size: 14px;
   line-height: 1.6;
@@ -644,11 +825,31 @@ export default {
   margin-top: 15px;
   padding-top: 15px;
   border-top: 1px solid #eee;
+  gap: 10px;
 }
 
-.job-date {
-  color: #999;
-  font-size: 13px;
+.btn-details {
+  padding: 8px 16px;
+  background: #f5f7fa;
+  color: #666;
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.btn-details:hover {
+  background: #e3e8ef;
+  color: #333;
+}
+
+.btn-details svg {
+  font-size: 12px;
 }
 
 .btn-apply {
@@ -660,10 +861,131 @@ export default {
   cursor: pointer;
   font-size: 14px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .btn-apply:hover {
   background: #45a049;
+}
+
+.btn-apply.already-applied {
+  background: #9e9e9e;
+  cursor: not-allowed;
+}
+
+.btn-apply:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.no-data .sub-text {
+  font-size: 14px;
+  color: #bbb;
+  margin-bottom: 20px;
+}
+
+.job-details {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #f5f7fa;
+  animation: slideDown 0.3s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.detail-section {
+  margin-bottom: 20px;
+  padding: 15px;
+  background: #f9fafb;
+  border-radius: 8px;
+}
+
+.detail-section h4 {
+  color: #4caf50;
+  font-size: 16px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.detail-section h4 svg {
+  font-size: 14px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.detail-label {
+  font-size: 12px;
+  color: #888;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.detail-value {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.detail-value.deadline {
+  color: #ff9800;
+  font-weight: 600;
+}
+
+.qualification-item {
+  padding: 10px 0;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.qualification-item:last-child {
+  border-bottom: none;
+}
+
+.qual-label {
+  font-size: 13px;
+  color: #666;
+  font-weight: 600;
+  min-width: 140px;
+}
+
+.qual-value {
+  font-size: 13px;
+  color: #333;
+  flex: 1;
+}
+
+.full-description {
+  font-size: 14px;
+  color: #555;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  margin: 0;
 }
 
 .table-container {
@@ -758,7 +1080,7 @@ export default {
   border-bottom: none;
 }
 
-.detail-item i {
+.detail-item svg {
   color: #4caf50;
   font-size: 18px;
   width: 20px;
@@ -774,7 +1096,7 @@ export default {
   color: #999;
 }
 
-.no-data i {
+.no-data svg {
   font-size: 64px;
   color: #ddd;
   margin-bottom: 20px;
@@ -826,6 +1148,21 @@ export default {
     flex-direction: column;
     align-items: start;
     gap: 10px;
+  }
+
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .job-footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-details,
+  .btn-apply {
+    width: 100%;
+    justify-content: center;
   }
 }
 </style>

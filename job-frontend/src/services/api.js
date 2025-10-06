@@ -145,7 +145,7 @@ export default {
   },
 
   submitApplication(formData) {
-    return api.post("/jobs/apply-simple/", formData, {
+    return api.post("/applications/submit-complete/", formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

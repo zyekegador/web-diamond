@@ -9,7 +9,11 @@
       </div>
 
       <div class="modal-body">
-        <form @submit.prevent="handleSubmit" class="csc-form">
+        <div v-if="optionsLoading" class="loading-message">
+          Loading form options...
+        </div>
+
+        <form v-else @submit.prevent="handleSubmit" class="csc-form">
           <div class="form-section">
             <h3>Position Information</h3>
 
@@ -46,19 +50,21 @@
               <div class="form-group">
                 <label>Monthly Salary *</label>
                 <input
-                  type="text"
+                  type="number"
+                  step="0.01"
                   v-model="jobForm.salary_range"
                   required
-                  placeholder="e.g. Php 30,024.00"
+                  placeholder="30024.00"
                 />
               </div>
               <div class="form-group">
                 <label>Job Type *</label>
                 <select v-model="jobForm.job_type" required>
                   <option value="">Select Type</option>
-                  <option value="full_time">Full Time</option>
-                  <option value="part_time">Part Time</option>
-                  <option value="contract">Contract</option>
+                  <option value="permanent">Permanent</option>
+                  <option value="casual">Casual</option>
+                  <option value="contractual">Contractual</option>
+                  <option value="coterminous">Coterminous</option>
                 </select>
               </div>
             </div>
@@ -137,18 +143,20 @@
 
             <div class="form-row">
               <div class="form-group">
-                <label>Training</label>
+                <label>Training *</label>
                 <input
                   type="text"
                   v-model="jobForm.training"
+                  required
                   placeholder="None Required or specify"
                 />
               </div>
               <div class="form-group">
-                <label>Work Experience</label>
+                <label>Work Experience *</label>
                 <input
                   type="text"
                   v-model="jobForm.work_experience"
+                  required
                   placeholder="None Required or specify"
                 />
               </div>
@@ -211,16 +219,6 @@ import api from "@/services/api";
 
 export default {
   name: "CreateJob",
-  props: {
-    eligibilityOptions: {
-      type: Array,
-      default: () => [],
-    },
-    educationOptions: {
-      type: Array,
-      default: () => [],
-    },
-  },
   data() {
     return {
       jobForm: {
@@ -232,13 +230,15 @@ export default {
         location: "",
         eligibility: "",
         education: "",
-        training: "",
-        work_experience: "",
+        training: "None Required",
+        work_experience: "None Required",
         description: "",
         requirements: "",
         posting_date: "",
         deadline: "",
       },
+      eligibilityOptions: [],
+      educationOptions: [],
       showEligibilitySuggestions: false,
       showEducationSuggestions: false,
       filteredEligibility: [],
@@ -246,20 +246,56 @@ export default {
       error: "",
       success: "",
       loading: false,
+      optionsLoading: true,
     };
   },
-  mounted() {
+  async mounted() {
     document.addEventListener("click", this.handleClickOutside);
+    await this.loadOptions();
   },
   beforeUnmount() {
     document.removeEventListener("click", this.handleClickOutside);
   },
   methods: {
+    async loadOptions() {
+      try {
+        this.optionsLoading = true;
+        this.error = "";
+
+        const [educationRes, eligibilityRes] = await Promise.all([
+          api.getEducationOptions(),
+          api.getEligibilityOptions(),
+        ]);
+
+        // Flatten education categories into array of program names
+        this.educationOptions = educationRes.data.flatMap((category) =>
+          category.programs.map((program) => program.name)
+        );
+
+        // Flatten eligibility categories into array of type names
+        this.eligibilityOptions = eligibilityRes.data.all_categories.flatMap(
+          (category) => category.types.map((type) => type.name)
+        );
+
+        console.log("Options loaded successfully:", {
+          education: this.educationOptions.length,
+          eligibility: this.eligibilityOptions.length,
+        });
+      } catch (error) {
+        console.error("Error loading options:", error);
+        this.error =
+          "Failed to load form options. Please refresh and try again.";
+      } finally {
+        this.optionsLoading = false;
+      }
+    },
+
     handleClickOutside(e) {
       if (!e.target.closest(".autocomplete-wrapper")) {
         this.closeAllSuggestions();
       }
     },
+
     filterEligibility() {
       if (!this.jobForm.eligibility) {
         this.filteredEligibility = this.eligibilityOptions;
@@ -271,10 +307,12 @@ export default {
       }
       this.showEligibilitySuggestions = true;
     },
+
     selectEligibility(option) {
       this.jobForm.eligibility = option;
       this.showEligibilitySuggestions = false;
     },
+
     filterEducation() {
       if (!this.jobForm.education) {
         this.filteredEducation = this.educationOptions;
@@ -286,41 +324,57 @@ export default {
       }
       this.showEducationSuggestions = true;
     },
+
     selectEducation(option) {
       this.jobForm.education = option;
       this.showEducationSuggestions = false;
     },
+
     closeAllSuggestions() {
       this.showEligibilitySuggestions = false;
       this.showEducationSuggestions = false;
     },
+
     async handleSubmit() {
       this.loading = true;
       this.error = "";
       this.success = "";
 
       try {
-        const fullDescription = `
-Position: ${this.jobForm.title}
-Plantilla Item No: ${this.jobForm.plantilla_no || "N/A"}
-Pay Grade: ${this.jobForm.pay_grade || "N/A"}
-Eligibility: ${this.jobForm.eligibility}
-Education: ${this.jobForm.education}
-Training: ${this.jobForm.training || "None Required"}
-Work Experience: ${this.jobForm.work_experience || "None Required"}
+        // Parse salary to remove any non-numeric characters except decimal point
+        const cleanSalary = this.jobForm.salary_range
+          .toString()
+          .replace(/[^\d.]/g, "");
 
-${this.jobForm.description}
-        `;
-
-        await api.createJob({
+        const jobData = {
+          // Basic Information (required)
           title: this.jobForm.title,
-          description: fullDescription,
-          requirements: this.jobForm.requirements,
+          place_of_assignment: this.jobForm.location,
+          monthly_salary: parseFloat(cleanSalary),
+
+          // Optional basic info
+          plantilla_item_no: this.jobForm.plantilla_no || "",
+          salary_job_grade: this.jobForm.pay_grade || "",
+
+          // Job Details (required)
+          description: this.jobForm.description,
           job_type: this.jobForm.job_type,
-          location: this.jobForm.location,
-          salary_range: this.jobForm.salary_range,
+
+          // Requirements (required)
+          education_requirement: this.jobForm.education,
+          eligibility_requirement: this.jobForm.eligibility,
+          training_requirement: this.jobForm.training || "None Required",
+          experience_requirement:
+            this.jobForm.work_experience || "None Required",
+          competency_requirement: "",
+
+          // Dates (required)
           deadline: this.jobForm.deadline,
-        });
+        };
+
+        console.log("Sending job data:", jobData);
+
+        const response = await api.createJob(jobData);
 
         this.success = "Job posted successfully!";
 
@@ -329,8 +383,22 @@ ${this.jobForm.description}
           this.$emit("close");
         }, 1500);
       } catch (error) {
-        this.error = "Failed to create job posting";
         console.error("Error creating job:", error);
+        console.error("Error response:", error.response?.data);
+
+        if (error.response?.data) {
+          const errors = error.response.data;
+          const errorMessages = Object.entries(errors)
+            .map(([field, messages]) => {
+              const msgArray = Array.isArray(messages) ? messages : [messages];
+              return `${field}: ${msgArray.join(", ")}`;
+            })
+            .join("\n");
+          this.error = errorMessages;
+        } else {
+          this.error =
+            "Failed to create job posting. Please check all required fields.";
+        }
       } finally {
         this.loading = false;
       }
@@ -400,6 +468,13 @@ ${this.jobForm.description}
 
 .modal-body {
   padding: 25px;
+}
+
+.loading-message {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+  font-size: 16px;
 }
 
 .csc-form .form-section {
@@ -537,6 +612,7 @@ ${this.jobForm.description}
   border-radius: 5px;
   margin-bottom: 10px;
   font-size: 14px;
+  white-space: pre-line;
 }
 
 .success-message {

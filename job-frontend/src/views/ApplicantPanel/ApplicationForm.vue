@@ -1,229 +1,3 @@
-<script>
-import api from "@/services/api";
-
-export default {
-  name: "ApplicationForm",
-  props: {
-    jobId: {
-      type: Number,
-      required: true,
-    },
-    jobTitle: {
-      type: String,
-      required: true,
-    },
-  },
-  data() {
-    return {
-      formData: {
-        cover_letter: "",
-      },
-      // PDS file (for OCR extraction)
-      pdsFile: null,
-
-      // Extracted documents (certificates, training, eligibility)
-      extractedDocs: {
-        graduation_cert: null,
-        eligibility_cert: null,
-        training_cert: null,
-      },
-
-      // Non-extracted documents (resume, etc.)
-      nonExtractedDocs: [],
-
-      currentStep: 1,
-      totalSteps: 4,
-      isSubmitting: false,
-      errors: {},
-      successMessage: "",
-    };
-  },
-  computed: {
-    canProceed() {
-      if (this.currentStep === 1)
-        return this.formData.cover_letter.trim().length > 0;
-      if (this.currentStep === 2) return this.pdsFile !== null;
-      if (this.currentStep === 3)
-        return Object.values(this.extractedDocs).some((doc) => doc !== null);
-      return true;
-    },
-    progressPercentage() {
-      return (this.currentStep / this.totalSteps) * 100;
-    },
-  },
-  methods: {
-    nextStep() {
-      if (this.canProceed && this.currentStep < this.totalSteps) {
-        this.currentStep++;
-        this.errors = {};
-      }
-    },
-    prevStep() {
-      if (this.currentStep > 1) {
-        this.currentStep--;
-        this.errors = {};
-      }
-    },
-    handlePDSFile(event) {
-      const file = event.target.files[0];
-      if (file) {
-        if (file.type !== "application/pdf" && !file.name.endsWith(".pdf")) {
-          this.errors.pds = "Please upload a PDF file";
-          this.pdsFile = null;
-          return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-          // 5MB
-          this.errors.pds = "File size must be less than 5MB";
-          this.pdsFile = null;
-          return;
-        }
-        this.pdsFile = file;
-        this.errors.pds = null;
-      }
-    },
-    handleExtractedDoc(event, docType) {
-      const file = event.target.files[0];
-      if (file) {
-        const validTypes = ["application/pdf", "image/jpeg", "image/png"];
-        if (!validTypes.includes(file.type)) {
-          this.errors[docType] = "Please upload PDF, JPG, or PNG file";
-          this.extractedDocs[docType] = null;
-          return;
-        }
-        if (file.size > 5 * 1024 * 1024) {
-          this.errors[docType] = "File size must be less than 5MB";
-          this.extractedDocs[docType] = null;
-          return;
-        }
-        this.extractedDocs[docType] = file;
-        this.errors[docType] = null;
-      }
-    },
-    handleNonExtractedDocs(event) {
-      const files = Array.from(event.target.files);
-      const validFiles = [];
-
-      for (const file of files) {
-        if (file.size > 10 * 1024 * 1024) {
-          this.errors.nonExtracted = "Each file must be less than 10MB";
-          continue;
-        }
-        validFiles.push(file);
-      }
-
-      this.nonExtractedDocs = validFiles;
-      if (validFiles.length > 0) {
-        this.errors.nonExtracted = null;
-      }
-    },
-    removeNonExtractedDoc(index) {
-      this.nonExtractedDocs.splice(index, 1);
-    },
-    removeExtractedDoc(docType) {
-      this.extractedDocs[docType] = null;
-      const input = this.$refs[`${docType}Input`];
-      if (input) input.value = "";
-    },
-    removePDSFile() {
-      this.pdsFile = null;
-      if (this.$refs.pdsInput) {
-        this.$refs.pdsInput.value = "";
-      }
-    },
-    async submitApplication() {
-      this.isSubmitting = true;
-      this.errors = {};
-      this.successMessage = "";
-
-      try {
-        // Create FormData for file upload
-        const formData = new FormData();
-
-        // Add basic info
-        formData.append("job", this.jobId);
-        formData.append("cover_letter", this.formData.cover_letter);
-
-        // Add PDS file (for OCR) - REQUIRED
-        if (this.pdsFile) {
-          formData.append("pds_file", this.pdsFile);
-        }
-
-        // Add extracted documents (certificates)
-        if (this.extractedDocs.graduation_cert) {
-          formData.append(
-            "graduation_cert",
-            this.extractedDocs.graduation_cert
-          );
-        }
-        if (this.extractedDocs.eligibility_cert) {
-          formData.append(
-            "eligibility_cert",
-            this.extractedDocs.eligibility_cert
-          );
-        }
-        if (this.extractedDocs.training_cert) {
-          formData.append("training_cert", this.extractedDocs.training_cert);
-        }
-
-        // Add other supporting documents
-        this.nonExtractedDocs.forEach((file) => {
-          formData.append("other_documents", file);
-        });
-
-        // Submit application
-        const response = await api.submitApplication(formData);
-
-        if (response.data.success) {
-          this.successMessage = "Application submitted successfully!";
-
-          // Redirect after 2 seconds
-          setTimeout(() => {
-            this.$emit("application-submitted");
-            // Redirect based on user type
-            const userType = localStorage.getItem("userType");
-            if (userType === "applicant") {
-              this.$router.push("/applicant/dashboard");
-            } else {
-              this.$router.push("/jobs");
-            }
-          }, 2000);
-        } else {
-          this.errors.submit =
-            response.data.message || "Failed to submit application";
-        }
-      } catch (error) {
-        console.error("Submission error:", error);
-        if (error.response?.data?.errors) {
-          // Handle validation errors
-          const errors = error.response.data.errors;
-          if (typeof errors === "object") {
-            this.errors = errors;
-            this.errors.submit = "Please check the form for errors";
-          } else {
-            this.errors.submit = errors;
-          }
-        } else if (error.response?.data?.error) {
-          this.errors.submit = error.response.data.error;
-        } else {
-          this.errors.submit =
-            "Failed to submit application. Please try again.";
-        }
-      } finally {
-        this.isSubmitting = false;
-      }
-    },
-    formatFileSize(bytes) {
-      if (bytes === 0) return "0 Bytes";
-      const k = 1024;
-      const sizes = ["Bytes", "KB", "MB"];
-      const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
-    },
-  },
-};
-</script>
-
 <template>
   <div class="modal-overlay" @click="$emit('close')">
     <div class="modal-content application-form" @click.stop>
@@ -252,260 +26,376 @@ export default {
       <div class="modal-body">
         <!-- Success Message -->
         <div v-if="successMessage" class="success-message">
-          <i class="fas fa-check-circle"></i>
+          <font-awesome-icon :icon="['fas', 'check-circle']" />
           {{ successMessage }}
         </div>
 
         <!-- Error Message -->
         <div v-if="errors.submit" class="error-message">
-          <i class="fas fa-exclamation-circle"></i>
+          <font-awesome-icon :icon="['fas', 'exclamation-circle']" />
           {{ errors.submit }}
         </div>
 
-        <!-- Step 1: Cover Letter -->
+        <!-- Step 1: Application Letter -->
         <div v-if="currentStep === 1" class="form-step">
           <div class="step-header">
-            <i class="fas fa-envelope step-icon"></i>
-            <h3>Cover Letter</h3>
-            <p>Tell us why you're interested in this position</p>
+            <font-awesome-icon :icon="['fas', 'envelope']" class="step-icon" />
+            <h3>Application Letter</h3>
+            <p>Indicate position, item number, and place of assignment</p>
           </div>
 
           <div class="form-group">
-            <label for="cover_letter">Your Cover Letter *</label>
-            <textarea
-              id="cover_letter"
-              v-model="formData.cover_letter"
-              rows="10"
-              placeholder="Write your cover letter here..."
-              :class="{ error: errors.cover_letter }"
-            ></textarea>
-            <span v-if="errors.cover_letter" class="error-text">{{
-              errors.cover_letter
+            <label>Upload Application Letter *</label>
+            <div class="file-upload-area">
+              <input
+                ref="applicationLetterInput"
+                type="file"
+                accept=".pdf,.doc,.docx"
+                @change="handleDocument($event, 'application_letter')"
+                class="file-input"
+                id="application-letter-file"
+              />
+              <label for="application-letter-file" class="file-upload-label">
+                <font-awesome-icon :icon="['fas', 'cloud-upload-alt']" />
+                <span v-if="!documents.application_letter"
+                  >Click to upload Application Letter (PDF or Word)</span
+                >
+                <span v-else>Change Application Letter file</span>
+              </label>
+            </div>
+
+            <div v-if="documents.application_letter" class="uploaded-file">
+              <div class="file-info">
+                <font-awesome-icon :icon="['fas', 'file-alt']" />
+                <div class="file-details">
+                  <span class="file-name">{{
+                    documents.application_letter.name
+                  }}</span>
+                  <span class="file-size">{{
+                    formatFileSize(documents.application_letter.size)
+                  }}</span>
+                </div>
+              </div>
+              <button
+                @click="removeDocument('application_letter')"
+                class="btn-remove"
+              >
+                <font-awesome-icon :icon="['fas', 'trash']" />
+              </button>
+            </div>
+
+            <span v-if="errors.application_letter" class="error-text">{{
+              errors.application_letter
             }}</span>
-            <span class="helper-text">Minimum 100 characters recommended</span>
+            <div class="info-box">
+              <font-awesome-icon :icon="['fas', 'info-circle']" />
+              <span
+                >Your letter should clearly state the position, item number, and
+                place of assignment you're applying for.</span
+              >
+            </div>
           </div>
         </div>
 
-        <!-- Step 2: PDS File (For OCR) -->
+        <!-- Step 2: Personal Data Sheet (PDS) - CS Form 212 -->
         <div v-if="currentStep === 2" class="form-step">
           <div class="step-header">
-            <i class="fas fa-file-pdf step-icon"></i>
+            <font-awesome-icon :icon="['fas', 'file-alt']" class="step-icon" />
             <h3>Personal Data Sheet (PDS)</h3>
-            <p>Upload your PDS for automatic data extraction</p>
+            <p>
+              CS Form No. 212, Revised 2017 with recent passport-sized picture
+            </p>
           </div>
 
           <div class="form-group">
-            <label>Upload PDS File *</label>
+            <label>Upload PDS (CS Form 212) *</label>
             <div class="file-upload-area">
               <input
                 ref="pdsInput"
                 type="file"
                 accept=".pdf"
-                @change="handlePDSFile"
+                @change="handleDocument($event, 'pds')"
                 class="file-input"
                 id="pds-file"
               />
               <label for="pds-file" class="file-upload-label">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <span v-if="!pdsFile">Click to upload PDS (PDF only)</span>
+                <font-awesome-icon :icon="['fas', 'cloud-upload-alt']" />
+                <span v-if="!documents.pds"
+                  >Click to upload PDS (PDF only)</span
+                >
                 <span v-else>Change PDS file</span>
               </label>
             </div>
 
-            <div v-if="pdsFile" class="uploaded-file">
+            <div v-if="documents.pds" class="uploaded-file">
               <div class="file-info">
-                <i class="fas fa-file-pdf"></i>
+                <font-awesome-icon :icon="['fas', 'file-pdf']" />
                 <div class="file-details">
-                  <span class="file-name">{{ pdsFile.name }}</span>
+                  <span class="file-name">{{ documents.pds.name }}</span>
                   <span class="file-size">{{
-                    formatFileSize(pdsFile.size)
+                    formatFileSize(documents.pds.size)
                   }}</span>
                 </div>
               </div>
-              <button @click="removePDSFile" class="btn-remove">
-                <i class="fas fa-trash"></i>
+              <button @click="removeDocument('pds')" class="btn-remove">
+                <font-awesome-icon :icon="['fas', 'trash']" />
               </button>
             </div>
 
             <span v-if="errors.pds" class="error-text">{{ errors.pds }}</span>
             <div class="info-box">
-              <i class="fas fa-info-circle"></i>
+              <font-awesome-icon :icon="['fas', 'info-circle']" />
               <span
-                >This file will be processed using OCR to extract your personal
-                information automatically.</span
+                >Download the PDS form at www.csc.gov.ph. Must include recent
+                passport-sized picture.</span
               >
             </div>
           </div>
         </div>
 
-        <!-- Step 3: Extracted Documents (Certificates) -->
+        <!-- Step 3: Work Experience Sheet (WES) -->
         <div v-if="currentStep === 3" class="form-step">
           <div class="step-header">
-            <i class="fas fa-certificate step-icon"></i>
-            <h3>Certificates & Credentials</h3>
-            <p>Upload your certificates for verification</p>
-          </div>
-
-          <div class="certificates-grid">
-            <!-- Graduation Certificate -->
-            <div class="form-group">
-              <label for="graduation_cert">Graduation Certificate</label>
-              <div class="file-upload-compact">
-                <input
-                  ref="graduation_certInput"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  @change="handleExtractedDoc($event, 'graduation_cert')"
-                  class="file-input"
-                  id="graduation_cert"
-                />
-                <label for="graduation_cert" class="file-upload-compact-label">
-                  <i class="fas fa-upload"></i>
-                  <span v-if="!extractedDocs.graduation_cert">Upload</span>
-                  <span v-else>Change</span>
-                </label>
-              </div>
-
-              <div
-                v-if="extractedDocs.graduation_cert"
-                class="uploaded-file-compact"
-              >
-                <i class="fas fa-file"></i>
-                <span class="file-name-compact">{{
-                  extractedDocs.graduation_cert.name
-                }}</span>
-                <button
-                  @click="removeExtractedDoc('graduation_cert')"
-                  class="btn-remove-compact"
-                >
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-              <span v-if="errors.graduation_cert" class="error-text">{{
-                errors.graduation_cert
-              }}</span>
-            </div>
-
-            <!-- Eligibility Certificate -->
-            <div class="form-group">
-              <label for="eligibility_cert">Eligibility Certificate</label>
-              <div class="file-upload-compact">
-                <input
-                  ref="eligibility_certInput"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  @change="handleExtractedDoc($event, 'eligibility_cert')"
-                  class="file-input"
-                  id="eligibility_cert"
-                />
-                <label for="eligibility_cert" class="file-upload-compact-label">
-                  <i class="fas fa-upload"></i>
-                  <span v-if="!extractedDocs.eligibility_cert">Upload</span>
-                  <span v-else>Change</span>
-                </label>
-              </div>
-
-              <div
-                v-if="extractedDocs.eligibility_cert"
-                class="uploaded-file-compact"
-              >
-                <i class="fas fa-file"></i>
-                <span class="file-name-compact">{{
-                  extractedDocs.eligibility_cert.name
-                }}</span>
-                <button
-                  @click="removeExtractedDoc('eligibility_cert')"
-                  class="btn-remove-compact"
-                >
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-              <span v-if="errors.eligibility_cert" class="error-text">{{
-                errors.eligibility_cert
-              }}</span>
-            </div>
-
-            <!-- Training Certificate -->
-            <div class="form-group">
-              <label for="training_cert">Training Certificate</label>
-              <div class="file-upload-compact">
-                <input
-                  ref="training_certInput"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  @change="handleExtractedDoc($event, 'training_cert')"
-                  class="file-input"
-                  id="training_cert"
-                />
-                <label for="training_cert" class="file-upload-compact-label">
-                  <i class="fas fa-upload"></i>
-                  <span v-if="!extractedDocs.training_cert">Upload</span>
-                  <span v-else>Change</span>
-                </label>
-              </div>
-
-              <div
-                v-if="extractedDocs.training_cert"
-                class="uploaded-file-compact"
-              >
-                <i class="fas fa-file"></i>
-                <span class="file-name-compact">{{
-                  extractedDocs.training_cert.name
-                }}</span>
-                <button
-                  @click="removeExtractedDoc('training_cert')"
-                  class="btn-remove-compact"
-                >
-                  <i class="fas fa-times"></i>
-                </button>
-              </div>
-              <span v-if="errors.training_cert" class="error-text">{{
-                errors.training_cert
-              }}</span>
-            </div>
-          </div>
-
-          <div class="info-box">
-            <i class="fas fa-info-circle"></i>
-            <span
-              >Upload at least one certificate. These documents will be
-              extracted and verified.</span
-            >
-          </div>
-        </div>
-
-        <!-- Step 4: Non-Extracted Documents (Supporting Documents) -->
-        <div v-if="currentStep === 4" class="form-step">
-          <div class="step-header">
-            <i class="fas fa-folder-open step-icon"></i>
-            <h3>Additional Documents</h3>
-            <p>Upload any supporting documents (resume, references, etc.)</p>
+            <font-awesome-icon :icon="['fas', 'briefcase']" class="step-icon" />
+            <h3>Work Experience Sheet (WES)</h3>
+            <p>Fully accomplished Work Experience Sheet</p>
           </div>
 
           <div class="form-group">
-            <label>Supporting Documents (Optional)</label>
+            <label>Upload Work Experience Sheet *</label>
+            <div class="file-upload-area">
+              <input
+                ref="wesInput"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                @change="handleDocument($event, 'wes')"
+                class="file-input"
+                id="wes-file"
+              />
+              <label for="wes-file" class="file-upload-label">
+                <font-awesome-icon :icon="['fas', 'cloud-upload-alt']" />
+                <span v-if="!documents.wes"
+                  >Click to upload WES (PDF, JPG, PNG)</span
+                >
+                <span v-else>Change WES file</span>
+              </label>
+            </div>
+
+            <div v-if="documents.wes" class="uploaded-file">
+              <div class="file-info">
+                <font-awesome-icon :icon="['fas', 'file']" />
+                <div class="file-details">
+                  <span class="file-name">{{ documents.wes.name }}</span>
+                  <span class="file-size">{{
+                    formatFileSize(documents.wes.size)
+                  }}</span>
+                </div>
+              </div>
+              <button @click="removeDocument('wes')" class="btn-remove">
+                <font-awesome-icon :icon="['fas', 'trash']" />
+              </button>
+            </div>
+
+            <span v-if="errors.wes" class="error-text">{{ errors.wes }}</span>
+            <div class="info-box">
+              <font-awesome-icon :icon="['fas', 'info-circle']" />
+              <span>Download the WES form at www.csc.gov.ph</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Step 4: Required Documents -->
+        <div v-if="currentStep === 4" class="form-step">
+          <div class="step-header">
+            <font-awesome-icon
+              :icon="['fas', 'folder-open']"
+              class="step-icon"
+            />
+            <h3>Required Documents</h3>
+            <p>Upload eligibility certificate and transcript of records</p>
+          </div>
+
+          <!-- Performance Rating (if applicable) -->
+          <div class="form-group">
+            <label for="performance_rating"
+              >Performance Rating (if applicable)</label
+            >
+            <div class="file-upload-area">
+              <input
+                ref="performanceInput"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                @change="handleDocument($event, 'performance_rating')"
+                class="file-input"
+                id="performance-file"
+              />
+              <label for="performance-file" class="file-upload-label">
+                <font-awesome-icon :icon="['fas', 'cloud-upload-alt']" />
+                <span v-if="!documents.performance_rating"
+                  >Click to upload Performance Rating</span
+                >
+                <span v-else>Change file</span>
+              </label>
+            </div>
+
+            <div v-if="documents.performance_rating" class="uploaded-file">
+              <div class="file-info">
+                <font-awesome-icon :icon="['fas', 'file']" />
+                <div class="file-details">
+                  <span class="file-name">{{
+                    documents.performance_rating.name
+                  }}</span>
+                  <span class="file-size">{{
+                    formatFileSize(documents.performance_rating.size)
+                  }}</span>
+                </div>
+              </div>
+              <button
+                @click="removeDocument('performance_rating')"
+                class="btn-remove"
+              >
+                <font-awesome-icon :icon="['fas', 'trash']" />
+              </button>
+            </div>
+          </div>
+
+          <!-- Eligibility Certificate -->
+          <div class="form-group">
+            <label for="eligibility_license"
+              >Eligibility Certificate / Board License *</label
+            >
+            <div class="file-upload-area">
+              <input
+                ref="eligibilityInput"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                @change="handleDocument($event, 'eligibility_license')"
+                class="file-input"
+                id="eligibility-file"
+              />
+              <label for="eligibility-file" class="file-upload-label">
+                <font-awesome-icon :icon="['fas', 'cloud-upload-alt']" />
+                <span v-if="!documents.eligibility_license"
+                  >Click to upload Eligibility/License</span
+                >
+                <span v-else>Change file</span>
+              </label>
+            </div>
+
+            <div v-if="documents.eligibility_license" class="uploaded-file">
+              <div class="file-info">
+                <font-awesome-icon :icon="['fas', 'certificate']" />
+                <div class="file-details">
+                  <span class="file-name">{{
+                    documents.eligibility_license.name
+                  }}</span>
+                  <span class="file-size">{{
+                    formatFileSize(documents.eligibility_license.size)
+                  }}</span>
+                </div>
+              </div>
+              <button
+                @click="removeDocument('eligibility_license')"
+                class="btn-remove"
+              >
+                <font-awesome-icon :icon="['fas', 'trash']" />
+              </button>
+            </div>
+
+            <span v-if="errors.eligibility_license" class="error-text">{{
+              errors.eligibility_license
+            }}</span>
+          </div>
+
+          <!-- Transcript of Records -->
+          <div class="form-group">
+            <label for="transcript">Transcript of Records *</label>
+            <div class="file-upload-area">
+              <input
+                ref="transcriptInput"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                @change="handleDocument($event, 'transcript')"
+                class="file-input"
+                id="transcript-file"
+              />
+              <label for="transcript-file" class="file-upload-label">
+                <font-awesome-icon :icon="['fas', 'cloud-upload-alt']" />
+                <span v-if="!documents.transcript"
+                  >Click to upload Transcript</span
+                >
+                <span v-else>Change file</span>
+              </label>
+            </div>
+
+            <div v-if="documents.transcript" class="uploaded-file">
+              <div class="file-info">
+                <font-awesome-icon :icon="['fas', 'file-alt']" />
+                <div class="file-details">
+                  <span class="file-name">{{ documents.transcript.name }}</span>
+                  <span class="file-size">{{
+                    formatFileSize(documents.transcript.size)
+                  }}</span>
+                </div>
+              </div>
+              <button @click="removeDocument('transcript')" class="btn-remove">
+                <font-awesome-icon :icon="['fas', 'trash']" />
+              </button>
+            </div>
+
+            <span v-if="errors.transcript" class="error-text">{{
+              errors.transcript
+            }}</span>
+          </div>
+        </div>
+
+        <!-- Step 5: Training Certificates & Other Documents -->
+        <div v-if="currentStep === 5" class="form-step">
+          <div class="step-header">
+            <font-awesome-icon
+              :icon="['fas', 'certificate']"
+              class="step-icon"
+            />
+            <h3>Training Certificates & Other Documents</h3>
+            <p>
+              Upload training certificates and any other supporting documents
+            </p>
+          </div>
+
+          <!-- Training Certificates -->
+          <div class="form-group">
+            <label>Training Certificates (Optional)</label>
             <div class="file-upload-area">
               <input
                 type="file"
                 multiple
-                @change="handleNonExtractedDocs"
+                accept=".pdf,.jpg,.jpeg,.png"
+                @change="
+                  handleMultipleDocuments($event, 'training_certificates')
+                "
                 class="file-input"
-                id="non-extracted-docs"
+                id="training-files"
               />
-              <label for="non-extracted-docs" class="file-upload-label">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <span>Click to upload documents (Multiple files allowed)</span>
+              <label for="training-files" class="file-upload-label">
+                <font-awesome-icon :icon="['fas', 'cloud-upload-alt']" />
+                <span
+                  >Click to upload Training Certificates (Multiple files
+                  allowed)</span
+                >
               </label>
             </div>
 
-            <div v-if="nonExtractedDocs.length > 0" class="uploaded-files-list">
+            <div
+              v-if="documents.training_certificates.length > 0"
+              class="uploaded-files-list"
+            >
               <div
-                v-for="(file, index) in nonExtractedDocs"
+                v-for="(file, index) in documents.training_certificates"
                 :key="index"
                 class="uploaded-file"
               >
                 <div class="file-info">
-                  <i class="fas fa-file"></i>
+                  <font-awesome-icon :icon="['fas', 'file']" />
                   <div class="file-details">
                     <span class="file-name">{{ file.name }}</span>
                     <span class="file-size">{{
@@ -514,19 +404,62 @@ export default {
                   </div>
                 </div>
                 <button
-                  @click="removeNonExtractedDoc(index)"
+                  @click="removeFromArray('training_certificates', index)"
                   class="btn-remove"
                 >
-                  <i class="fas fa-trash"></i>
+                  <font-awesome-icon :icon="['fas', 'trash']" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Other Documents -->
+          <div class="form-group">
+            <label>Other Supporting Documents (Optional)</label>
+            <div class="file-upload-area">
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.jpg,.jpeg,.png"
+                @change="handleMultipleDocuments($event, 'other')"
+                class="file-input"
+                id="other-files"
+              />
+              <label for="other-files" class="file-upload-label">
+                <font-awesome-icon :icon="['fas', 'cloud-upload-alt']" />
+                <span
+                  >Click to upload Other Documents (Multiple files
+                  allowed)</span
+                >
+              </label>
+            </div>
+
+            <div v-if="documents.other.length > 0" class="uploaded-files-list">
+              <div
+                v-for="(file, index) in documents.other"
+                :key="index"
+                class="uploaded-file"
+              >
+                <div class="file-info">
+                  <font-awesome-icon :icon="['fas', 'file']" />
+                  <div class="file-details">
+                    <span class="file-name">{{ file.name }}</span>
+                    <span class="file-size">{{
+                      formatFileSize(file.size)
+                    }}</span>
+                  </div>
+                </div>
+                <button
+                  @click="removeFromArray('other', index)"
+                  class="btn-remove"
+                >
+                  <font-awesome-icon :icon="['fas', 'trash']" />
                 </button>
               </div>
             </div>
 
-            <span v-if="errors.nonExtracted" class="error-text">{{
-              errors.nonExtracted
-            }}</span>
             <span class="helper-text"
-              >Accepted formats: PDF, DOC, DOCX, JPG, PNG, ZIP</span
+              >Accepted formats: PDF, JPG, PNG. Max 10MB per file.</span
             >
           </div>
 
@@ -534,30 +467,88 @@ export default {
           <div class="review-summary">
             <h4>Application Summary</h4>
             <div class="summary-item">
-              <i class="fas fa-check-circle"></i>
-              <span>Cover Letter: Completed</span>
-            </div>
-            <div class="summary-item">
-              <i
-                :class="
-                  pdsFile ? 'fas fa-check-circle' : 'fas fa-exclamation-circle'
-                "
-              ></i>
-              <span>PDS File: {{ pdsFile ? "Uploaded" : "Missing" }}</span>
-            </div>
-            <div class="summary-item">
-              <i class="fas fa-check-circle"></i>
+              <font-awesome-icon
+                :icon="[
+                  'fas',
+                  documents.application_letter
+                    ? 'check-circle'
+                    : 'exclamation-circle',
+                ]"
+              />
               <span
-                >Certificates:
-                {{ Object.values(extractedDocs).filter((d) => d).length }}
-                uploaded</span
+                >Application Letter:
+                {{
+                  documents.application_letter ? "Uploaded" : "Missing"
+                }}</span
               >
             </div>
             <div class="summary-item">
-              <i class="fas fa-check-circle"></i>
+              <font-awesome-icon
+                :icon="[
+                  'fas',
+                  documents.pds ? 'check-circle' : 'exclamation-circle',
+                ]"
+              />
+              <span>PDS: {{ documents.pds ? "Uploaded" : "Missing" }}</span>
+            </div>
+            <div class="summary-item">
+              <font-awesome-icon
+                :icon="[
+                  'fas',
+                  documents.wes ? 'check-circle' : 'exclamation-circle',
+                ]"
+              />
+              <span>WES: {{ documents.wes ? "Uploaded" : "Missing" }}</span>
+            </div>
+            <div class="summary-item">
+              <font-awesome-icon
+                :icon="[
+                  'fas',
+                  documents.eligibility_license
+                    ? 'check-circle'
+                    : 'exclamation-circle',
+                ]"
+              />
               <span
-                >Supporting Documents: {{ nonExtractedDocs.length }} files</span
+                >Eligibility/License:
+                {{
+                  documents.eligibility_license ? "Uploaded" : "Missing"
+                }}</span
               >
+            </div>
+            <div class="summary-item">
+              <font-awesome-icon
+                :icon="[
+                  'fas',
+                  documents.transcript ? 'check-circle' : 'exclamation-circle',
+                ]"
+              />
+              <span
+                >Transcript:
+                {{ documents.transcript ? "Uploaded" : "Missing" }}</span
+              >
+            </div>
+            <div class="summary-item">
+              <font-awesome-icon :icon="['fas', 'info-circle']" />
+              <span
+                >Performance Rating:
+                {{
+                  documents.performance_rating
+                    ? "Uploaded"
+                    : "Not provided (if applicable)"
+                }}</span
+              >
+            </div>
+            <div class="summary-item">
+              <font-awesome-icon :icon="['fas', 'check-circle']" />
+              <span
+                >Training Certificates:
+                {{ documents.training_certificates.length }} files</span
+              >
+            </div>
+            <div class="summary-item">
+              <font-awesome-icon :icon="['fas', 'check-circle']" />
+              <span>Other Documents: {{ documents.other.length }} files</span>
             </div>
           </div>
         </div>
@@ -571,7 +562,7 @@ export default {
           class="btn-secondary"
           :disabled="isSubmitting"
         >
-          <i class="fas fa-arrow-left"></i>
+          <font-awesome-icon :icon="['fas', 'arrow-left']" />
           Previous
         </button>
 
@@ -582,16 +573,16 @@ export default {
           :disabled="!canProceed"
         >
           Next
-          <i class="fas fa-arrow-right"></i>
+          <font-awesome-icon :icon="['fas', 'arrow-right']" />
         </button>
 
         <button
           v-if="currentStep === totalSteps"
           @click="submitApplication"
           class="btn-submit"
-          :disabled="isSubmitting || !pdsFile"
+          :disabled="isSubmitting || !canSubmit"
         >
-          <i class="fas fa-paper-plane"></i>
+          <font-awesome-icon :icon="['fas', 'paper-plane']" />
           {{ isSubmitting ? "Submitting..." : "Submit Application" }}
         </button>
       </div>
@@ -599,7 +590,269 @@ export default {
   </div>
 </template>
 
+<script>
+import api from "@/services/api";
+
+export default {
+  name: "ApplicationForm",
+  props: {
+    jobId: {
+      type: Number,
+      required: true,
+    },
+    jobTitle: {
+      type: String,
+      required: true,
+    },
+  },
+  data() {
+    return {
+      formData: {},
+      documents: {
+        application_letter: null,
+        pds: null,
+        wes: null,
+        performance_rating: null,
+        eligibility_license: null,
+        transcript: null,
+        training_certificates: [],
+        other: [],
+      },
+      currentStep: 1,
+      totalSteps: 5,
+      isSubmitting: false,
+      errors: {},
+      successMessage: "",
+    };
+  },
+  computed: {
+    canProceed() {
+      if (this.currentStep === 1)
+        return this.documents.application_letter !== null;
+      if (this.currentStep === 2) return this.documents.pds !== null;
+      if (this.currentStep === 3) return this.documents.wes !== null;
+      if (this.currentStep === 4)
+        return (
+          this.documents.eligibility_license !== null &&
+          this.documents.transcript !== null
+        );
+      return true;
+    },
+    canSubmit() {
+      return (
+        this.documents.application_letter !== null &&
+        this.documents.pds !== null &&
+        this.documents.wes !== null &&
+        this.documents.eligibility_license !== null &&
+        this.documents.transcript !== null
+      );
+    },
+    progressPercentage() {
+      return (this.currentStep / this.totalSteps) * 100;
+    },
+  },
+  methods: {
+    nextStep() {
+      if (this.canProceed && this.currentStep < this.totalSteps) {
+        this.currentStep++;
+        this.errors = {};
+      }
+    },
+    prevStep() {
+      if (this.currentStep > 1) {
+        this.currentStep--;
+        this.errors = {};
+      }
+    },
+    handleDocument(event, docType) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      // Validate file type based on document type
+      let validTypes = ["application/pdf", "image/jpeg", "image/png"];
+
+      // Allow Word documents for application letter
+      if (docType === "application_letter") {
+        validTypes = [
+          "application/pdf",
+          "application/msword",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        ];
+      }
+
+      if (!validTypes.includes(file.type)) {
+        if (docType === "application_letter") {
+          this.errors[docType] =
+            "Please upload PDF or Word document (.doc, .docx)";
+        } else {
+          this.errors[docType] = "Please upload PDF, JPG, or PNG file";
+        }
+        this.documents[docType] = null;
+        return;
+      }
+
+      // Validate file size (10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        this.errors[docType] = "File size must be less than 10MB";
+        this.documents[docType] = null;
+        return;
+      }
+
+      this.documents[docType] = file;
+      this.errors[docType] = null;
+    },
+    handleMultipleDocuments(event, docType) {
+      const files = Array.from(event.target.files);
+      const validFiles = [];
+
+      for (const file of files) {
+        if (file.size > 10 * 1024 * 1024) {
+          this.errors[docType] = "Each file must be less than 10MB";
+          continue;
+        }
+        validFiles.push(file);
+      }
+
+      this.documents[docType] = [...this.documents[docType], ...validFiles];
+      if (validFiles.length > 0) {
+        this.errors[docType] = null;
+      }
+    },
+    removeDocument(docType) {
+      this.documents[docType] = null;
+      const refName = `${docType}Input`;
+      if (this.$refs[refName]) {
+        this.$refs[refName].value = "";
+      }
+    },
+    removeFromArray(docType, index) {
+      this.documents[docType].splice(index, 1);
+    },
+    async submitApplication() {
+      this.isSubmitting = true;
+      this.errors = {};
+      this.successMessage = "";
+
+      try {
+        const formData = new FormData();
+
+        // Add job ID
+        formData.append("job_id", this.jobId);
+
+        // Add application letter file
+        if (this.documents.application_letter) {
+          formData.append(
+            "application_letter",
+            this.documents.application_letter
+          );
+        }
+
+        // Add required documents
+        if (this.documents.pds) {
+          formData.append("pds_file", this.documents.pds);
+        }
+        if (this.documents.wes) {
+          formData.append("wes_file", this.documents.wes);
+        }
+        if (this.documents.eligibility_license) {
+          formData.append(
+            "eligibility_license_file",
+            this.documents.eligibility_license
+          );
+        }
+        if (this.documents.transcript) {
+          formData.append("transcript_file", this.documents.transcript);
+        }
+
+        // Add optional documents
+        if (this.documents.performance_rating) {
+          formData.append(
+            "performance_rating_file",
+            this.documents.performance_rating
+          );
+        }
+
+        // Add training certificates
+        this.documents.training_certificates.forEach((file) => {
+          formData.append("training_certificates_files", file);
+        });
+
+        // Add other documents
+        this.documents.other.forEach((file) => {
+          formData.append("other_files", file);
+        });
+
+        // Submit application
+        const response = await api.submitApplication(formData);
+
+        this.successMessage = "Application submitted successfully!";
+
+        // Redirect after 2 seconds
+        setTimeout(() => {
+          this.$emit("application-submitted");
+          this.$router.push("/applicant/dashboard");
+        }, 2000);
+      } catch (error) {
+        console.error("Submission error:", error);
+        console.error(
+          "ERROR DETAILS:",
+          JSON.stringify(error.response?.data, null, 2)
+        );
+
+        if (error.response?.data) {
+          const errorData = error.response.data;
+
+          // Show non_field_errors prominently (like "Job is closed")
+          if (
+            errorData.non_field_errors &&
+            errorData.non_field_errors.length > 0
+          ) {
+            this.errors.submit = errorData.non_field_errors[0];
+          }
+          // Show field-specific errors
+          else if (typeof errorData === "object") {
+            // Copy all field errors
+            Object.keys(errorData).forEach((key) => {
+              if (Array.isArray(errorData[key])) {
+                this.errors[key] = errorData[key][0];
+              } else {
+                this.errors[key] = errorData[key];
+              }
+            });
+            this.errors.submit = "Please check the form for errors";
+          }
+          // Show generic error message
+          else {
+            this.errors.submit = errorData.toString();
+          }
+        } else {
+          this.errors.submit =
+            "Failed to submit application. Please try again.";
+        }
+      } finally {
+        this.isSubmitting = false;
+      }
+    },
+    formatFileSize(bytes) {
+      if (bytes === 0) return "0 Bytes";
+      const k = 1024;
+      const sizes = ["Bytes", "KB", "MB"];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + " " + sizes[i];
+    },
+  },
+};
+</script>
+
 <style scoped>
+.summary-item i.fa-exclamation-circle {
+  color: #ff9800;
+}
+
+.summary-item i.fa-info-circle {
+  color: #2196f3;
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -730,27 +983,6 @@ export default {
   font-size: 14px;
 }
 
-.form-group textarea {
-  width: 100%;
-  padding: 12px 15px;
-  border: 2px solid #e0e0e0;
-  border-radius: 8px;
-  font-family: inherit;
-  font-size: 14px;
-  resize: vertical;
-  transition: all 0.3s;
-}
-
-.form-group textarea:focus {
-  outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.form-group textarea.error {
-  border-color: #f44336;
-}
-
 .file-input {
   display: none;
 }
@@ -843,71 +1075,6 @@ export default {
   color: white;
 }
 
-.certificates-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.file-upload-compact-label {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 10px 20px;
-  border: 2px solid #667eea;
-  border-radius: 8px;
-  background: white;
-  cursor: pointer;
-  transition: all 0.3s;
-  font-size: 14px;
-  color: #667eea;
-  font-weight: 600;
-}
-
-.file-upload-compact-label:hover {
-  background: #667eea;
-  color: white;
-}
-
-.uploaded-file-compact {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  background: #f8f9fd;
-  border-radius: 6px;
-  margin-top: 10px;
-}
-
-.uploaded-file-compact i {
-  color: #667eea;
-}
-
-.file-name-compact {
-  flex: 1;
-  font-size: 12px;
-  color: #333;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.btn-remove-compact {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: transparent;
-  color: #999;
-  cursor: pointer;
-  transition: color 0.3s;
-}
-
-.btn-remove-compact:hover {
-  color: #f44336;
-}
-
 .uploaded-files-list {
   display: flex;
   flex-direction: column;
@@ -963,15 +1130,6 @@ export default {
 .summary-item i {
   color: #4caf50;
   font-size: 18px;
-}
-
-.summary-item i.fa-exclamation-circle {
-  color: #ff9800;
-}
-
-.summary-item span {
-  color: #333;
-  font-size: 14px;
 }
 
 .error-text {
@@ -1085,10 +1243,6 @@ export default {
     max-width: 100%;
     max-height: 100vh;
     border-radius: 0;
-  }
-
-  .certificates-grid {
-    grid-template-columns: 1fr;
   }
 
   .modal-footer {

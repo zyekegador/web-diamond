@@ -17,21 +17,21 @@
             :class="{ active: activeTab === 'overview' }"
             @click="activeTab = 'overview'"
           >
-            <i class="fas fa-chart-line"></i>
+            <font-awesome-icon :icon="['fas', 'chart-line']" />
             <span>Overview</span>
           </li>
           <li
             :class="{ active: activeTab === 'create-hr' }"
             @click="activeTab = 'create-hr'"
           >
-            <i class="fas fa-user-plus"></i>
+            <font-awesome-icon :icon="['fas', 'user-plus']" />
             <span>Create HR Account</span>
           </li>
           <li
             :class="{ active: activeTab === 'hr-list' }"
             @click="activeTab = 'hr-list'"
           >
-            <i class="fas fa-users"></i>
+            <font-awesome-icon :icon="['fas', 'users']" />
             <span>HR Staff List</span>
           </li>
         </ul>
@@ -44,7 +44,7 @@
           <div class="stats-grid">
             <div class="stat-card">
               <div class="stat-icon blue">
-                <i class="fas fa-users"></i>
+                <font-awesome-icon :icon="['fas', 'users']" />
               </div>
               <div class="stat-info">
                 <h3>Total HR Staff</h3>
@@ -54,7 +54,7 @@
 
             <div class="stat-card">
               <div class="stat-icon green">
-                <i class="fas fa-user-check"></i>
+                <font-awesome-icon :icon="['fas', 'user-check']" />
               </div>
               <div class="stat-info">
                 <h3>Total Applicants</h3>
@@ -64,7 +64,7 @@
 
             <div class="stat-card">
               <div class="stat-icon orange">
-                <i class="fas fa-briefcase"></i>
+                <font-awesome-icon :icon="['fas', 'briefcase']" />
               </div>
               <div class="stat-info">
                 <h3>Active Jobs</h3>
@@ -74,7 +74,7 @@
 
             <div class="stat-card">
               <div class="stat-icon purple">
-                <i class="fas fa-file-alt"></i>
+                <font-awesome-icon :icon="['fas', 'file-alt']" />
               </div>
               <div class="stat-info">
                 <h3>Total Applications</h3>
@@ -341,7 +341,7 @@ export default {
   border-right: 4px solid #45a049;
 }
 
-.sidebar-menu li i {
+.sidebar-menu li svg {
   font-size: 18px;
   width: 20px;
 }
