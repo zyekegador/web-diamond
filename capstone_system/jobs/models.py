@@ -152,10 +152,16 @@ class Application(models.Model):
         limit_choices_to={'user_type': 'applicant'}
     )
     
-    # Letter of Intent
-    letter_of_intent = models.TextField(
-        help_text="Indicate position, item number, and place of assignment"
-    )
+    application_letter = models.FileField(
+    upload_to='application_letters/',
+    validators=[
+        FileExtensionValidator(
+            allowed_extensions=['pdf', 'doc', 'docx']
+        )
+    ],
+     null=True,
+    blank=True  
+)
     
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
     notes = models.TextField(blank=True, null=True, help_text="HR notes")
@@ -198,7 +204,7 @@ class Application(models.Model):
             
             # Create document type folders matching CSC requirements
             doc_types = [
-                'letter_of_intent',
+                'application_letter',
                 'pds',
                 'wes',
                 'performance_rating',
@@ -239,7 +245,7 @@ class ApplicationDocument(models.Model):
     """Document storage matching CSC requirements"""
     
     DOCUMENT_TYPES = [
-        ('letter_of_intent', 'Letter of Intent'),
+        ('application_letter', 'Application Letter'),
         ('pds', 'Personal Data Sheet (CS Form 212)'),
         ('wes', 'Work Experience Sheet'),
         ('performance_rating', 'Performance Rating (if applicable)'),

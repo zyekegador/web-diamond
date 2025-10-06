@@ -163,7 +163,7 @@ class ApplicationSerializer(serializers.ModelSerializer):
     class Meta:
         model = Application
         fields = [
-            'id', 'job', 'applicant', 'letter_of_intent',
+            'id', 'job', 'applicant', 'application_letter',
             'status', 'notes', 'screening_score', 'screening_result',
             'screening_result_display', 'screening_details',
             'documents', 'has_required_documents',
@@ -180,7 +180,7 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Application
-        fields = ['job', 'letter_of_intent']
+        fields = ['job', 'application_letter']
     
     def validate(self, attrs):
         request = self.context.get('request')
@@ -200,7 +200,7 @@ class ApplicationCreateSerializer(serializers.ModelSerializer):
 class ApplicationWithDocumentsSerializer(serializers.Serializer):
     """For complete application submission with documents"""
     job_id = serializers.IntegerField()
-    letter_of_intent = serializers.CharField()
+    application_letter = serializers.FileField()
     
     # Required documents
     pds_file = serializers.FileField()
@@ -218,6 +218,19 @@ class ApplicationWithDocumentsSerializer(serializers.Serializer):
         child=serializers.FileField(),
         required=False
     )
+    
+    def validate_application_letter(self, value):
+        """Validate application letter file type"""
+        allowed_types = [
+            'application/pdf',
+            'application/msword',
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        ]
+        if value.content_type not in allowed_types:
+            raise serializers.ValidationError(
+                "Application letter must be PDF or Word document (.pdf, .doc, .docx)"
+            )
+        return value
     
     def validate(self, attrs):
         request = self.context.get('request')
@@ -243,11 +256,11 @@ class ApplicationWithDocumentsSerializer(serializers.Serializer):
         request = self.context.get('request')
         job = validated_data['job']
         
-        # Create application
+        # Create application with application_letter file
         application = Application.objects.create(
             job=job,
             applicant=request.user,
-            letter_of_intent=validated_data['letter_of_intent']
+            application_letter=validated_data['application_letter']
         )
         
         # Map files to document types
