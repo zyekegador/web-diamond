@@ -76,11 +76,11 @@ export default {
       },
       error: "",
       loading: false,
-      expectedRole: "applicant", // Default role
+      expectedRole: "", // Will be set in created hook
     };
   },
-  mounted() {
-    // Get the expected role from query parameter
+  created() {
+    // Set the expected role from query parameter only once when component is created
     this.expectedRole = this.$route.query.role || "applicant";
 
     // Validate role parameter
@@ -287,7 +287,7 @@ input:focus {
   padding: 20px 0px 20px 0px;
   display: inline-flex;
   align-items: center;
-  gap: 8px; /* This replaces ml-2 */
+  gap: 8px;
   color: #791f1f;
   text-decoration: none;
   font-size: 14px;

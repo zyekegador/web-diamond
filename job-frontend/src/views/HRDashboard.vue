@@ -64,11 +64,13 @@ export default {
           api.getEligibilityOptions(),
         ]);
 
+        // Education API returns array directly
         this.educationOptions = eduRes.data.flatMap((cat) =>
           cat.programs.map((prog) => prog.name)
         );
 
-        this.eligibilityOptions = eligRes.data.flatMap((cat) =>
+        // Eligibility API returns an object with 'all_categories' key
+        this.eligibilityOptions = eligRes.data.all_categories.flatMap((cat) =>
           cat.types.map((type) => type.name)
         );
       } catch (error) {

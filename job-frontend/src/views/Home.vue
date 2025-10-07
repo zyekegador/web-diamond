@@ -3,7 +3,7 @@
     <section class="hero-section">
       <div class="header-in-hero">
         <div class="logo-section">
-          <img src="@/assets/logo.png" alt="Company Logo" class="logo" />
+          <img src="@/assets/logo.jpg" alt="Company Logo" class="logo" />
           <span class="company-name clickable" @click="showAbout = true"
             >ABOUT BUTUAN</span
           >
@@ -172,13 +172,13 @@ export default {
 .logo-section {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 0px;
 }
 
 .logo {
   width: 100px;
   height: 50px;
-  object-fit: cover;
+  object-fit: contain;
 }
 
 .company-name {
@@ -186,6 +186,7 @@ export default {
   font-size: 16px;
   color: #1a237e;
   letter-spacing: 0.5px;
+  margin-left: 0px;
 }
 
 .company-name.clickable {

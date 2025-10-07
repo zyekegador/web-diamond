@@ -31,15 +31,26 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Check if this is NOT a logout request
+      // Check if this is NOT a logout request AND NOT a login request
       const isLogoutRequest = error.config.url.includes("/logout/");
+      const isLoginRequest = error.config.url.includes("/login/");
 
-      if (!isLogoutRequest) {
+      // Only redirect if it's not a login or logout request
+      if (!isLogoutRequest && !isLoginRequest) {
         console.log("❌ 401 Unauthorized - clearing storage");
         localStorage.removeItem("token");
         localStorage.removeItem("user");
         localStorage.removeItem("userType");
-        window.location.href = "/login";
+
+        // Preserve query parameters when redirecting
+        const currentParams = new URLSearchParams(window.location.search);
+        const role = currentParams.get("role");
+
+        if (role) {
+          window.location.href = `/login?role=${role}`;
+        } else {
+          window.location.href = "/login";
+        }
       }
     }
     return Promise.reject(error);
@@ -129,6 +140,7 @@ export default {
   getApplicationDetail(id) {
     return api.get(`/applications/${id}/`);
   },
+
   getJobApplications(jobId) {
     return api.get(`/hr/jobs/${jobId}/applications/`);
   },
@@ -136,6 +148,7 @@ export default {
   updateApplicationStatus(id, data) {
     return api.patch(`/hr/applications/${id}/update-status/`, data);
   },
+
   getEducationOptions() {
     return api.get("/options/education/");
   },
