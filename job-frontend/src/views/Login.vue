@@ -17,13 +17,23 @@
         />
         <span
           >{{
-            expectedRole === "applicant" ? "APPLICANT" : "HR STAFF"
+            expectedRole === "applicant" ? "APPLICANT" : "EMPLOYEE"
           }}
           LOGIN</span
         >
       </div>
 
       <form @submit.prevent="handleLogin">
+        <!-- Show role dropdown only for HR staff login -->
+        <div v-if="expectedRole === 'hr'" class="form-group">
+          <label>Login As</label>
+          <select v-model="selectedRole" required>
+            <option value="">Select Role</option>
+            <option value="hr">HR Staff</option>
+            <option value="admin">Admin</option>
+          </select>
+        </div>
+
         <div class="form-group">
           <label>Username</label>
           <input
@@ -74,6 +84,7 @@ export default {
         username: "",
         password: "",
       },
+      selectedRole: "",
       error: "",
       loading: false,
       expectedRole: "", // Will be set in created hook
@@ -93,21 +104,41 @@ export default {
       this.loading = true;
       this.error = "";
 
+      // Validate role selection for HR staff
+      if (this.expectedRole === "hr" && !this.selectedRole) {
+        this.error = "Please select your role (HR Staff or Admin)";
+        this.loading = false;
+        return;
+      }
+
       try {
         const response = await api.login(this.credentials);
 
         const actualUserType = response.data.user.user_type;
 
         // Validate that the user's role matches what they selected
-        if (
-          this.expectedRole === "hr" &&
-          actualUserType !== "hr" &&
-          actualUserType !== "admin"
-        ) {
-          this.error =
-            "Access denied. This account is not authorized for HR access.";
-          this.loading = false;
-          return;
+        if (this.expectedRole === "hr") {
+          // Check if user type matches the selected role
+          if (this.selectedRole === "admin" && actualUserType !== "admin") {
+            this.error = "Access denied. This account is not an Admin account.";
+            this.loading = false;
+            return;
+          }
+
+          if (this.selectedRole === "hr" && actualUserType !== "hr") {
+            this.error =
+              "Access denied. This account is not an HR Staff account.";
+            this.loading = false;
+            return;
+          }
+
+          // General validation - must be hr or admin
+          if (actualUserType !== "hr" && actualUserType !== "admin") {
+            this.error =
+              "Access denied. This account is not authorized for HR access.";
+            this.loading = false;
+            return;
+          }
         }
 
         if (
@@ -210,19 +241,26 @@ label {
   font-size: 14px;
 }
 
-input {
+input,
+select {
   width: 100%;
   padding: 12px;
   border: 1px solid #ddd;
   border-radius: 6px;
   font-size: 14px;
   transition: border-color 0.3s;
+  background-color: white;
 }
 
-input:focus {
+input:focus,
+select:focus {
   outline: none;
   border-color: #4caf50;
   box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+}
+
+select {
+  cursor: pointer;
 }
 
 .btn-primary {

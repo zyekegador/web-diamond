@@ -76,7 +76,7 @@ const routes = [
   },
   {
     path: "/hr/applications/:jobId",
-    name: "ViewApplications",
+    name: "ViewApplication",
     component: ViewApplications,
     meta: { requiresAuth: true, role: "hr" },
   },

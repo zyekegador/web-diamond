@@ -1,149 +1,3 @@
-<script>
-import api from "@/services/api";
-import CreateJob from "./HRPanel/CreateJob.vue";
-
-export default {
-  name: "HRDashboard",
-  components: {
-    CreateJob,
-  },
-  data() {
-    return {
-      user: JSON.parse(localStorage.getItem("user") || "{}"),
-      activeView: "participants",
-      searchQuery: "",
-      showUserMenu: false,
-      jobs: [],
-      showCreateJobModal: false,
-      selectedJob: null,
-      showApplicantsModal: false,
-      currentPage: 1,
-      itemsPerPage: 10,
-      eligibilityOptions: [],
-      educationOptions: [],
-    };
-  },
-  computed: {
-    filteredJobs() {
-      if (!this.searchQuery) return this.paginatedJobs;
-
-      const query = this.searchQuery.toLowerCase();
-      return this.jobs.filter(
-        (job) =>
-          job.title.toLowerCase().includes(query) ||
-          job.location.toLowerCase().includes(query)
-      );
-    },
-    paginatedJobs() {
-      const start = (this.currentPage - 1) * this.itemsPerPage;
-      const end = start + this.itemsPerPage;
-      return this.jobs.slice(start, end);
-    },
-    totalPages() {
-      return Math.ceil(this.jobs.length / this.itemsPerPage);
-    },
-    displayedJobs() {
-      return this.searchQuery ? this.filteredJobs : this.paginatedJobs;
-    },
-  },
-  async mounted() {
-    await this.loadOptions();
-    this.loadJobs();
-  },
-  methods: {
-    toggleUserMenu() {
-      this.showUserMenu = !this.showUserMenu;
-    },
-    closeUserMenu() {
-      this.showUserMenu = false;
-    },
-    async loadOptions() {
-      try {
-        const [eduRes, eligRes] = await Promise.all([
-          api.getEducationOptions(),
-          api.getEligibilityOptions(),
-        ]);
-
-        // Education API returns array directly
-        this.educationOptions = eduRes.data.flatMap((cat) =>
-          cat.programs.map((prog) => prog.name)
-        );
-
-        // Eligibility API returns an object with 'all_categories' key
-        this.eligibilityOptions = eligRes.data.all_categories.flatMap((cat) =>
-          cat.types.map((type) => type.name)
-        );
-      } catch (error) {
-        console.error("Error loading options:", error);
-        this.educationOptions = [];
-        this.eligibilityOptions = [];
-      }
-    },
-    async loadJobs() {
-      try {
-        const response = await api.getHRJobs();
-        this.jobs = response.data.map((job) => ({
-          ...job,
-          applicationsCount: job.applications?.length || 0,
-          status: this.getJobStatus(job),
-        }));
-      } catch (error) {
-        console.error("Error loading jobs:", error);
-      }
-    },
-    getJobStatus(job) {
-      const deadline = new Date(job.deadline);
-      const today = new Date();
-      const daysLeft = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
-
-      if (daysLeft < 0) return { label: "Closed", color: "red" };
-      if (daysLeft <= 5) return { label: "Re-open", color: "yellow" };
-      if (job.applicationsCount > 0)
-        return { label: "Screening", color: "blue" };
-      return { label: "Open", color: "green" };
-    },
-    async viewApplicants(job) {
-      try {
-        const response = await api.getJobApplications(job.id);
-        this.selectedJob = {
-          ...job,
-          applications: response.data,
-        };
-        this.showApplicantsModal = true;
-      } catch (error) {
-        console.error("Error loading applications:", error);
-        alert("Failed to load applicants");
-      }
-    },
-    handleJobCreated() {
-      this.loadJobs();
-    },
-    async handleLogout() {
-      await api.logout();
-      this.$router.push("/");
-    },
-    formatDate(dateString) {
-      return new Date(dateString).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    },
-    changePage(page) {
-      if (page >= 1 && page <= this.totalPages) {
-        this.currentPage = page;
-      }
-    },
-    getFileUrl(fileUrl) {
-      if (!fileUrl) return null;
-      // Ensure the URL is absolute
-      if (fileUrl.startsWith("http")) return fileUrl;
-      return `${api.defaults.baseURL}${fileUrl}`;
-    },
-  },
-};
-</script>
-
 <template>
   <div class="hr-dashboard">
     <!-- Top Header -->
@@ -365,85 +219,148 @@ export default {
       @close="showCreateJobModal = false"
       @jobCreated="handleJobCreated"
     />
-
-    <!-- View Applicants Modal -->
-    <div
-      v-if="showApplicantsModal"
-      class="modal-overlay"
-      @click="showApplicantsModal = false"
-    >
-      <div class="modal-content applicants-modal" @click.stop>
-        <div class="modal-header">
-          <h2>Applicants for {{ selectedJob?.title }}</h2>
-          <button @click="showApplicantsModal = false" class="btn-close">
-            <font-awesome-icon :icon="['fas', 'times']" />
-          </button>
-        </div>
-
-        <div class="modal-body">
-          <div class="applicants-list">
-            <table class="applicants-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Applied Date</th>
-                  <th>Status</th>
-                  <th>Documents</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="app in selectedJob?.applications" :key="app.id">
-                  <td>
-                    {{ app.applicant.first_name }} {{ app.applicant.last_name }}
-                  </td>
-                  <td>{{ app.applicant.email }}</td>
-                  <td>{{ app.applicant.phone_number || "N/A" }}</td>
-                  <td>{{ formatDate(app.applied_at) }}</td>
-                  <td>
-                    <span :class="['status-badge', 'small', app.status]">
-                      {{ app.status }}
-                    </span>
-                  </td>
-                  <td class="documents-cell">
-                    <a
-                      v-if="app.resume"
-                      :href="getFileUrl(app.resume)"
-                      target="_blank"
-                      class="doc-icon"
-                      title="Resume"
-                    >
-                      <font-awesome-icon :icon="['fas', 'file-pdf']" />
-                    </a>
-                    <a
-                      v-if="app.pds"
-                      :href="getFileUrl(app.pds)"
-                      target="_blank"
-                      class="doc-icon"
-                      title="PDS"
-                    >
-                      <font-awesome-icon :icon="['fas', 'file-alt']" />
-                    </a>
-                    <a
-                      v-if="app.certificates"
-                      :href="getFileUrl(app.certificates)"
-                      target="_blank"
-                      class="doc-icon"
-                      title="Certificates"
-                    >
-                      <font-awesome-icon :icon="['fas', 'file-archive']" />
-                    </a>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
+
+<script>
+import api from "@/services/api";
+import CreateJob from "./HRPanel/CreateJob.vue";
+
+export default {
+  name: "HRDashboard",
+  components: {
+    CreateJob,
+  },
+  data() {
+    return {
+      user: JSON.parse(localStorage.getItem("user") || "{}"),
+      activeView: "participants",
+      searchQuery: "",
+      showUserMenu: false,
+      jobs: [],
+      showCreateJobModal: false,
+      currentPage: 1,
+      itemsPerPage: 10,
+      eligibilityOptions: [],
+      educationOptions: [],
+    };
+  },
+  computed: {
+    filteredJobs() {
+      if (!this.searchQuery) return this.paginatedJobs;
+
+      const query = this.searchQuery.toLowerCase();
+      return this.jobs.filter(
+        (job) =>
+          job.title.toLowerCase().includes(query) ||
+          job.location.toLowerCase().includes(query)
+      );
+    },
+    paginatedJobs() {
+      const start = (this.currentPage - 1) * this.itemsPerPage;
+      const end = start + this.itemsPerPage;
+      return this.jobs.slice(start, end);
+    },
+    totalPages() {
+      return Math.ceil(this.jobs.length / this.itemsPerPage);
+    },
+    displayedJobs() {
+      return this.searchQuery ? this.filteredJobs : this.paginatedJobs;
+    },
+  },
+  async mounted() {
+    await this.loadOptions();
+    this.loadJobs();
+  },
+  methods: {
+    toggleUserMenu() {
+      this.showUserMenu = !this.showUserMenu;
+    },
+    closeUserMenu() {
+      this.showUserMenu = false;
+    },
+    async loadOptions() {
+      try {
+        const [eduRes, eligRes] = await Promise.all([
+          api.getEducationOptions(),
+          api.getEligibilityOptions(),
+        ]);
+
+        // Education API returns array directly
+        this.educationOptions = eduRes.data.flatMap((cat) =>
+          cat.programs.map((prog) => prog.name)
+        );
+
+        // Eligibility API returns an object with 'all_categories' key
+        this.eligibilityOptions = eligRes.data.all_categories.flatMap((cat) =>
+          cat.types.map((type) => type.name)
+        );
+      } catch (error) {
+        console.error("Error loading options:", error);
+        this.educationOptions = [];
+        this.eligibilityOptions = [];
+      }
+    },
+    async loadJobs() {
+      try {
+        const response = await api.getHRJobs();
+        this.jobs = response.data.map((job) => ({
+          ...job,
+          applicationsCount: job.applications?.length || 0,
+          status: this.getJobStatus(job),
+        }));
+      } catch (error) {
+        console.error("Error loading jobs:", error);
+      }
+    },
+    getJobStatus(job) {
+      const deadline = new Date(job.deadline);
+      const today = new Date();
+      const daysLeft = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24));
+
+      if (daysLeft < 0) return { label: "Closed", color: "red" };
+      if (daysLeft <= 5) return { label: "Re-open", color: "yellow" };
+      if (job.applicationsCount > 0)
+        return { label: "Screening", color: "blue" };
+      return { label: "Open", color: "green" };
+    },
+    viewApplicants(job) {
+      // Navigate to ViewApplication route with job ID and data as query params
+      this.$router.push({
+        name: "ViewApplication",
+        params: { jobId: job.id },
+        query: {
+          title: job.title,
+          location: job.location || job.place_of_assignment,
+          created_at: job.created_at,
+          deadline: job.deadline,
+          status_label: job.status.label,
+          status_color: job.status.color,
+        },
+      });
+    },
+    handleJobCreated() {
+      this.loadJobs();
+    },
+    async handleLogout() {
+      await api.logout();
+      this.$router.push("/");
+    },
+    formatDate(dateString) {
+      return new Date(dateString).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    },
+    changePage(page) {
+      if (page >= 1 && page <= this.totalPages) {
+        this.currentPage = page;
+      }
+    },
+  },
+};
+</script>
 
 <style scoped>
 * {
@@ -459,7 +376,6 @@ export default {
 /* Header */
 .top-header {
   background: #2b3e75;
-
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -859,36 +775,6 @@ export default {
   color: #c62828;
 }
 
-.status-badge.small {
-  padding: 4px 10px;
-  font-size: 11px;
-}
-
-.status-badge.pending {
-  background: #fff3e0;
-  color: #f57c00;
-}
-
-.status-badge.under_review {
-  background: #e3f2fd;
-  color: #1976d2;
-}
-
-.status-badge.shortlisted {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
-
-.status-badge.accepted {
-  background: #e8f5e9;
-  color: #2e7d32;
-}
-
-.status-badge.rejected {
-  background: #ffebee;
-  color: #c62828;
-}
-
 .btn-view {
   padding: 8px 20px;
   background: #4caf50;
@@ -954,121 +840,6 @@ export default {
 .pagination-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  padding: 20px;
-}
-
-.modal-content {
-  background: white;
-  border-radius: 15px;
-  width: 100%;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.applicants-modal {
-  max-width: 1200px;
-}
-
-.modal-header {
-  padding: 25px 30px;
-  border-bottom: 1px solid #f0f0f0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  background: white;
-  z-index: 10;
-}
-
-.modal-header h2 {
-  color: #2b3e75;
-  font-size: 22px;
-  font-weight: 700;
-}
-
-.btn-close {
-  width: 40px;
-  height: 40px;
-  border: none;
-  background: #f5f5f5;
-  border-radius: 50%;
-  cursor: pointer;
-  font-size: 18px;
-  color: #666;
-  transition: all 0.3s;
-}
-
-.btn-close:hover {
-  background: #e0e0e0;
-}
-
-.modal-body {
-  padding: 30px;
-}
-
-.applicants-table {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.applicants-table thead {
-  background: #f8f9fc;
-}
-
-.applicants-table th {
-  padding: 12px 15px;
-  text-align: left;
-  font-weight: 600;
-  font-size: 13px;
-  color: #2b3e75;
-  text-transform: uppercase;
-}
-
-.applicants-table td {
-  padding: 12px 15px;
-  border-bottom: 1px solid #f0f0f0;
-  font-size: 14px;
-}
-
-.documents-cell {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-}
-
-.doc-icon {
-  width: 35px;
-  height: 35px;
-  background: #f8f9fc;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #667eea;
-  text-decoration: none;
-  transition: all 0.3s;
-  font-size: 16px;
-}
-
-.doc-icon:hover {
-  background: #667eea;
-  color: white;
-  transform: translateY(-2px);
 }
 
 /* Placeholder */

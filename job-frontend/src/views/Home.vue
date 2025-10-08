@@ -50,7 +50,7 @@
                 <font-awesome-icon :icon="['fas', 'briefcase']" />
               </div>
               <div class="btn-text">
-                <span class="btn-title">HR STAFF</span>
+                <span class="btn-title">EMPLOYEE</span>
                 <span class="btn-subtitle">Log in to manage</span>
               </div>
             </router-link>
