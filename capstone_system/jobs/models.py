@@ -57,6 +57,7 @@ class Job(models.Model):
     description = models.TextField()
     job_type = models.CharField(max_length=20, choices=JOB_TYPE_CHOICES, default='permanent')
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    was_closed = models.BooleanField(default=False, help_text="Tracks if job was reopened after being closed")  # ADD THIS LINE
     
     # Requirements
     education_requirement = models.TextField(help_text="e.g., Bachelor's Degree relevant to the job")

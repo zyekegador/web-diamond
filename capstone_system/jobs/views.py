@@ -4,6 +4,9 @@ from rest_framework.decorators import api_view, permission_classes, parser_class
 from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework.views import APIView
 from django.db import transaction
+from django.db.models import Count
+from datetime import datetime
+from django.utils import timezone
 
 from .models import Job, Application, ApplicationDocument
 from .models import EducationCategory, EligibilityCategory
@@ -107,6 +110,85 @@ class HRJobListView(generics.ListAPIView):
             )
         return Job.objects.none()
 
+
+@api_view(['PATCH'])
+@permission_classes([permissions.IsAuthenticated])
+def update_job_dates(request, pk):
+    """
+    HR can update job posting and closing dates
+    Allows reopening of closed jobs by changing deadline
+    """
+    # Check if user is HR
+    if request.user.user_type != 'hr':
+        return Response(
+            {'error': 'Only HR staff can update job dates'},
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    try:
+        # Get job and verify HR owns it
+        job = Job.objects.get(pk=pk, posted_by=request.user)
+        
+        # Check if job was closed before update
+        was_closed_before = job.deadline < timezone.now().date()
+        
+        # Update created_at (DateTimeField) if provided
+        if 'created_at' in request.data:
+            try:
+                date_str = request.data['created_at']
+                if isinstance(date_str, str):
+                    naive_date = datetime.strptime(date_str, '%Y-%m-%d')
+                    job.created_at = job.created_at.replace(
+                        year=naive_date.year,
+                        month=naive_date.month,
+                        day=naive_date.day
+                    )
+            except (ValueError, TypeError) as e:
+                return Response(
+                    {'error': f'Invalid created_at format: {str(e)}. Expected YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # Update deadline (DateField) if provided
+        if 'deadline' in request.data:
+            try:
+                date_str = request.data['deadline']
+                if isinstance(date_str, str):
+                    new_deadline = datetime.strptime(date_str, '%Y-%m-%d').date()
+                    job.deadline = new_deadline
+                    
+                    # Mark as reopened if it was closed and now has future deadline
+                    if was_closed_before and new_deadline >= timezone.now().date():
+                        job.was_closed = True
+                    elif new_deadline < timezone.now().date():
+                        job.was_closed = False
+                        
+            except (ValueError, TypeError) as e:
+                return Response(
+                    {'error': f'Invalid deadline format: {str(e)}. Expected YYYY-MM-DD'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        job.save()
+        
+        # Return updated job data
+        serializer = JobSerializer(job)
+        return Response({
+            'success': True,
+            'message': 'Job dates updated successfully',
+            'job': serializer.data
+        }, status=status.HTTP_200_OK)
+        
+    except Job.DoesNotExist:
+        return Response(
+            {'error': 'Job not found or you do not have permission to update it'},
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)},
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 # ============= APPLICATION VIEWS =============
 

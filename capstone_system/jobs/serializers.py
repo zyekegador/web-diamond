@@ -79,7 +79,7 @@ class ApplicationDocumentCreateSerializer(serializers.ModelSerializer):
 # Job Serializers
 class JobSerializer(serializers.ModelSerializer):
     posted_by = UserSerializer(read_only=True)
-    application_count = serializers.SerializerMethodField()
+    applications_count = serializers.IntegerField(source='applications.count', read_only=True)
     education_levels = EducationLevelSerializer(many=True, read_only=True)
     eligibility_types = EligibilityTypeSerializer(many=True, read_only=True)
     is_open = serializers.BooleanField(read_only=True)
@@ -93,11 +93,14 @@ class JobSerializer(serializers.ModelSerializer):
             'eligibility_requirement', 'competency_requirement',
             'education_levels', 'eligibility_types',
             'status', 'posted_by', 'created_at', 'deadline', 
-            'application_count', 'is_open'
+            'applications_count', 'is_open'
         ]
         read_only_fields = ['id', 'posted_by', 'created_at']
     
-    def get_application_count(self, obj):
+    def get_applications_count(self, obj):
+        # Try to use annotated count first, fallback to query
+        if hasattr(obj, 'applications_count'):
+            return obj.applications_count
         return obj.applications.count()
 
 

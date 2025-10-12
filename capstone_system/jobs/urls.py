@@ -7,6 +7,7 @@ from .views import (
     JobUpdateView,
     JobDeleteView,
     HRJobListView,
+    update_job_dates,
     
     # Application views
     ApplicationCreateView,
@@ -36,6 +37,7 @@ urlpatterns = [
     path('hr/jobs/create/', JobCreateView.as_view(), name='job-create'),
     path('hr/jobs/<int:pk>/update/', JobUpdateView.as_view(), name='job-update'),
     path('hr/jobs/<int:pk>/delete/', JobDeleteView.as_view(), name='job-delete'),
+    path('hr/jobs/<int:pk>/update-dates/', update_job_dates, name='job-update-dates'),  # FIXED: removed views. prefix
     
     # ============= APPLICATION SUBMISSION =============
     # Method 1: Two-step process (create application, then upload documents)
