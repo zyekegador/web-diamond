@@ -202,7 +202,7 @@ export default {
           location: query.location || "N/A",
           created_at: query.created_at || new Date().toISOString(),
           deadline: query.deadline || new Date().toISOString(),
-          applications: applicationsResponse.data,
+          applications: applicationsResponse.data || [], // Ensure it's always an array
           status: {
             label: query.status_label || "Open",
             color: query.status_color || "green",
@@ -210,8 +210,13 @@ export default {
         };
 
         console.log("Selected Job:", this.selectedJob);
+        console.log(
+          "Applications count:",
+          this.selectedJob.applications.length
+        ); // Add this debug
       } catch (error) {
         console.error("Error loading applications:", error);
+        console.error("Error response:", error.response); // Add more debug info
         this.error =
           error.response?.data?.message ||
           "Failed to load applicants. Please try again.";

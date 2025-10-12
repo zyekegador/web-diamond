@@ -116,6 +116,10 @@ export default {
     return api.put(`/hr/jobs/${id}/update/`, data);
   },
 
+  updateJobDates(id, data) {
+    return api.patch(`/hr/jobs/${id}/update-dates/`, data);
+  },
+
   deleteJob(id) {
     return api.delete(`/hr/jobs/${id}/delete/`);
   },
