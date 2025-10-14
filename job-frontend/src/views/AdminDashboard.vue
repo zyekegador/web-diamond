@@ -1,14 +1,55 @@
 <template>
   <div class="admin-dashboard">
-    <nav class="dashboard-nav">
-      <div class="nav-brand">
-        <h2>Admin Panel</h2>
+    <!-- Top Header -->
+    <header class="top-header">
+      <div class="header-left">
+        <img src="@/assets/butuanon.png" alt="Logo" class="logo" />
+        <div class="header-title">
+          <h1>DASHBOARD</h1>
+        </div>
       </div>
-      <div class="nav-user">
-        <span>Welcome, {{ user.username }}</span>
-        <button @click="handleLogout" class="btn-logout">Logout</button>
+
+      <div class="header-right">
+        <button class="icon-btn">
+          <font-awesome-icon :icon="['fas', 'search']" />
+        </button>
+        <button class="icon-btn">
+          <font-awesome-icon :icon="['fas', 'bell']" />
+        </button>
+        <button class="icon-btn">
+          <font-awesome-icon :icon="['fas', 'cog']" />
+        </button>
+
+        <div class="user-menu" @click.stop="toggleUserMenu">
+          <div class="user-avatar">
+            <font-awesome-icon :icon="['fas', 'user-circle']" />
+          </div>
+          <div class="user-info">
+            <span class="user-name">{{ user.username }}</span>
+            <span class="user-role">Admin</span>
+          </div>
+        </div>
+
+        <div v-if="showUserMenu" class="user-dropdown" @click.stop>
+          <div class="dropdown-header">
+            <div class="dropdown-avatar">
+              <font-awesome-icon :icon="['fas', 'user-circle']" />
+            </div>
+            <div class="dropdown-info">
+              <strong>{{ user.username }} {{ user.last_name }}</strong>
+              <span>{{ user.email }}</span>
+            </div>
+          </div>
+          <div class="dropdown-divider"></div>
+          <button @click="handleLogout" class="dropdown-item logout">
+            <i class="fas fa-sign-out-alt"></i>
+            <span>Logout</span>
+          </button>
+        </div>
       </div>
-    </nav>
+    </header>
+
+    <!--Dashboard-->
 
     <div class="dashboard-container">
       <aside class="sidebar">
@@ -186,6 +227,7 @@ export default {
   data() {
     return {
       user: JSON.parse(localStorage.getItem("user") || "{}"),
+      showUserMenu: false,
       activeTab: "overview",
       stats: {
         hrCount: 0,
@@ -211,8 +253,27 @@ export default {
   },
   mounted() {
     this.loadHRList();
+    document.addEventListener("click", this.closeUserMenu);
+  },
+  beforeUnmount() {
+    document.removeEventListener("click", this.closeUserMenu);
   },
   methods: {
+    toggleUserMenu() {
+      this.showUserMenu = !this.showUserMenu;
+    },
+    closeUserMenu(event) {
+      const menu = this.$el.querySelector(".user-dropdown");
+      const avatar = this.$el.querySelector(".user-menu");
+      if (
+        this.showUserMenu &&
+        menu &&
+        !menu.contains(event.target) &&
+        !avatar.contains(event.target)
+      ) {
+        this.showUserMenu = false;
+      }
+    },
     async loadHRList() {
       try {
         const response = await api.getHRList();
@@ -253,8 +314,14 @@ export default {
       }
     },
     async handleLogout() {
-      await api.logout();
-      this.$router.push("/");
+      try {
+        await api.logout();
+      } catch (error) {
+        console.error("Logout failed:", error);
+      } finally {
+        localStorage.removeItem("user"); //
+        this.$router.push("/");
+      }
     },
     formatDate(dateString) {
       return new Date(dateString).toLocaleDateString("en-US", {
@@ -268,9 +335,181 @@ export default {
 </script>
 
 <style scoped>
-.admin-dashboard {
+.hr-dashboard {
   min-height: 100vh;
-  background: #f5f7fa;
+}
+
+/* Header */
+.top-header {
+  background: #2b3e75;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-left .logo {
+  height: 75px;
+}
+
+.header-title h1 {
+  color: white;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 1px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  position: relative;
+}
+
+.icon-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s;
+}
+
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.user-menu {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  padding: 8px 15px;
+  border-radius: 25px;
+  transition: background 0.3s;
+}
+
+.user-menu:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 24px;
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.user-name {
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.user-role {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 12px;
+}
+
+.user-dropdown {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  min-width: 250px;
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.dropdown-header {
+  padding: 20px;
+  background: #f8f9fc;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.dropdown-avatar {
+  width: 50px;
+  height: 50px;
+  background: #4a5f8d;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-size: 26px;
+}
+
+.dropdown-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dropdown-info strong {
+  color: #333;
+  font-size: 15px;
+}
+
+.dropdown-info span {
+  color: #666;
+  font-size: 13px;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background: #e3e8ef;
+}
+
+.dropdown-item {
+  width: 100%;
+  padding: 15px 20px;
+  border: none;
+  background: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #333;
+  transition: background 0.2s;
+}
+
+.dropdown-item:hover {
+  background: #f8f9fc;
+}
+
+.dropdown-item.logout {
+  color: #d32f2f;
+}
+
+.dropdown-item.logout:hover {
+  background: #ffebee;
 }
 
 .dashboard-nav {
