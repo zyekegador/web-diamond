@@ -74,9 +74,6 @@
             <span>HR Staff List</span>
           </li>
         </ul>
-
-        <!-- Right-side button 
-        <button class="new-btn">NEW +</button> -->
       </nav>
     </div>
 
@@ -128,6 +125,54 @@
                 <font-awesome-icon :icon="['fas', 'file-alt']" />
               </div>
               <p class="stat-number">{{ stats.applicationCount }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Recent Activity Section -->
+        <div class="recent-activity-section">
+          <div class="activity-header">
+            <h2>Activity</h2>
+          </div>
+
+          <div v-if="filteredDate" class="date-filter-badge">
+            <span>Showing activities for: {{ formatSelectedDate }}</span>
+            <button @click="clearDateFilter" class="clear-filter">
+              <font-awesome-icon :icon="['fas', 'times']" />
+            </button>
+          </div>
+
+          <div class="activity-table-container">
+            <table class="activity-table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Activity Type</th>
+                  <th>User</th>
+                  <th>Details</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="activity in filteredActivities" :key="activity.id">
+                  <td>{{ formatActivityDate(activity.created_at) }}</td>
+                  <td>
+                    <span :class="['activity-badge', activity.type]">
+                      {{ activity.type }}
+                    </span>
+                  </td>
+                  <td>{{ activity.user_name }}</td>
+                  <td>{{ activity.details }}</td>
+                  <td>
+                    <span :class="['status-badge', activity.status]">
+                      {{ activity.status }}
+                    </span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div v-if="filteredActivities.length === 0" class="no-activity">
+              No activities found
             </div>
           </div>
         </div>
@@ -222,6 +267,57 @@
           </div>
         </div>
       </div>
+
+      <!-- Calendar Modal -->
+      <div
+        v-if="showCalendarModal"
+        class="modal-overlay"
+        @click="closeCalendarModal"
+      >
+        <div class="modal-content calendar-modal" @click.stop>
+          <div class="modal-header">
+            <h2>Calendar</h2>
+            <button class="close-btn" @click="closeCalendarModal">
+              <font-awesome-icon :icon="['fas', 'times']" />
+            </button>
+          </div>
+          <div class="modal-body">
+            <div class="calendar-controls">
+              <button @click="previousMonth" class="nav-btn">
+                <font-awesome-icon :icon="['fas', 'chevron-left']" />
+              </button>
+              <h3>{{ formatMonthYear }}</h3>
+              <button @click="nextMonth" class="nav-btn">
+                <font-awesome-icon :icon="['fas', 'chevron-right']" />
+              </button>
+            </div>
+            <div class="calendar-grid">
+              <div
+                class="calendar-day-header"
+                v-for="day in ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']"
+                :key="day"
+              >
+                {{ day }}
+              </div>
+              <div
+                v-for="date in calendarDates"
+                :key="date.key"
+                :class="[
+                  'calendar-date',
+                  {
+                    'other-month': date.otherMonth,
+                    today: date.isToday,
+                    selected: date.isSelected,
+                  },
+                ]"
+                @click="selectDate(date)"
+              >
+                {{ date.day }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
   </div>
 </template>
@@ -235,6 +331,7 @@ export default {
     return {
       user: JSON.parse(localStorage.getItem("user") || "{}"),
       showUserMenu: false,
+      showCalendarModal: false,
       activeTab: "overview",
       stats: {
         hrCount: 0,
@@ -256,14 +353,124 @@ export default {
       error: "",
       success: "",
       loading: false,
+      currentDate: new Date(),
+      selectedDate: null,
+      recentActivities: [],
+      searchQuery: "",
+      filteredDate: null,
     };
   },
   mounted() {
     this.loadHRList();
+    this.loadRecentActivities();
     document.addEventListener("click", this.closeUserMenu);
+    document.addEventListener("keydown", this.handleEscKey);
   },
   beforeUnmount() {
     document.removeEventListener("click", this.closeUserMenu);
+    document.removeEventListener("keydown", this.handleEscKey);
+  },
+  computed: {
+    formatMonthYear() {
+      return this.currentDate.toLocaleDateString("en-US", {
+        month: "long",
+        year: "numeric",
+      });
+    },
+    calendarDates() {
+      const year = this.currentDate.getFullYear();
+      const month = this.currentDate.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+      const prevLastDay = new Date(year, month, 0);
+      const firstDayOfWeek = firstDay.getDay();
+      const lastDate = lastDay.getDate();
+      const prevLastDate = prevLastDay.getDate();
+
+      const dates = [];
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      // Previous month days
+      for (let i = firstDayOfWeek - 1; i >= 0; i--) {
+        const day = prevLastDate - i;
+        dates.push({
+          day,
+          otherMonth: true,
+          isToday: false,
+          isSelected: false,
+          key: `prev-${day}`,
+        });
+      }
+
+      // Current month days
+      for (let day = 1; day <= lastDate; day++) {
+        const date = new Date(year, month, day);
+        date.setHours(0, 0, 0, 0);
+        const isToday = date.getTime() === today.getTime();
+        const isSelected =
+          this.selectedDate && date.getTime() === this.selectedDate.getTime();
+
+        dates.push({
+          day,
+          otherMonth: false,
+          isToday,
+          isSelected,
+          date,
+          key: `curr-${day}`,
+        });
+      }
+
+      // Next month days
+      const remainingDays = 42 - dates.length;
+      for (let day = 1; day <= remainingDays; day++) {
+        dates.push({
+          day,
+          otherMonth: true,
+          isToday: false,
+          isSelected: false,
+          key: `next-${day}`,
+        });
+      }
+
+      return dates;
+    },
+    formatSelectedDate() {
+      if (!this.filteredDate) return "";
+      return this.filteredDate.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+    },
+    filteredActivities() {
+      let activities = this.recentActivities;
+
+      // Filter by date if selected
+      if (this.filteredDate) {
+        const filterDate = new Date(this.filteredDate);
+        filterDate.setHours(0, 0, 0, 0);
+
+        activities = activities.filter((activity) => {
+          const activityDate = new Date(activity.created_at);
+          activityDate.setHours(0, 0, 0, 0);
+          return activityDate.getTime() === filterDate.getTime();
+        });
+      }
+
+      // Filter by search query
+      if (this.searchQuery) {
+        const query = this.searchQuery.toLowerCase();
+        activities = activities.filter(
+          (activity) =>
+            activity.user_name.toLowerCase().includes(query) ||
+            activity.type.toLowerCase().includes(query) ||
+            activity.details.toLowerCase().includes(query)
+        );
+      }
+
+      return activities;
+    },
   },
   methods: {
     toggleUserMenu() {
@@ -281,11 +488,94 @@ export default {
         this.showUserMenu = false;
       }
     },
+    openCalendar() {
+      this.showCalendarModal = true;
+    },
+    closeCalendarModal() {
+      this.showCalendarModal = false;
+    },
+    handleEscKey(event) {
+      if (event.key === "Escape" && this.showCalendarModal) {
+        this.closeCalendarModal();
+      }
+    },
+    previousMonth() {
+      this.currentDate = new Date(
+        this.currentDate.getFullYear(),
+        this.currentDate.getMonth() - 1,
+        1
+      );
+    },
+    nextMonth() {
+      this.currentDate = new Date(
+        this.currentDate.getFullYear(),
+        this.currentDate.getMonth() + 1,
+        1
+      );
+    },
+    selectDate(dateObj) {
+      if (!dateObj.otherMonth) {
+        this.selectedDate = dateObj.date;
+        this.filteredDate = dateObj.date;
+        this.closeCalendarModal();
+        console.log("Selected date:", dateObj.date.toLocaleDateString());
+      }
+    },
+    clearDateFilter() {
+      this.filteredDate = null;
+      this.selectedDate = null;
+    },
+    async loadRecentActivities() {
+      try {
+        const activities = [];
+
+        this.hrList.forEach((hr) => {
+          activities.push({
+            id: `hr-${hr.id}`,
+            created_at: hr.created_at,
+            type: "HR Account Created",
+            user_name: `${hr.first_name} ${hr.last_name}`,
+            details: `New HR account created for ${hr.email}`,
+            status: "completed",
+          });
+        });
+
+        // Sort by date (newest first)
+        activities.sort(
+          (a, b) => new Date(b.created_at) - new Date(a.created_at)
+        );
+
+        this.recentActivities = activities;
+      } catch (error) {
+        console.error("Error loading recent activities:", error);
+      }
+    },
+    formatActivityDate(dateString) {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffTime = Math.abs(now - date);
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        return "Today";
+      } else if (diffDays === 1) {
+        return "Yesterday";
+      } else if (diffDays < 7) {
+        return `${diffDays} days ago`;
+      } else {
+        return date.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      }
+    },
     async loadHRList() {
       try {
         const response = await api.getHRList();
         this.hrList = response.data;
         this.stats.hrCount = this.hrList.length;
+        this.loadRecentActivities();
       } catch (error) {
         console.error("Error loading HR list:", error);
       }
@@ -326,7 +616,7 @@ export default {
       } catch (error) {
         console.error("Logout failed:", error);
       } finally {
-        localStorage.removeItem("user"); //
+        localStorage.removeItem("user");
         this.$router.push("/");
       }
     },
@@ -546,6 +836,7 @@ export default {
 .btn-logout:hover {
   background: #d32f2f;
 }
+
 .dashboard-container {
   display: flex;
   min-height: calc(100vh - 70px);
@@ -601,25 +892,6 @@ export default {
   padding-bottom: 3px;
 }
 
-/* NEW button below the menu 
-.new-btn {
-  background-color: #5d74c7;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 20px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s;
-  margin-left: auto;
-}
-
-.new-btn:hover {
-  background-color: #4a61b5;
-  transform: translateY(-1px);
-}
-  */
-
 /* Main Content */
 .main-content {
   flex: 1;
@@ -627,6 +899,7 @@ export default {
   padding: 40px;
   overflow-y: auto;
 }
+
 .content-section h1 {
   margin-bottom: 30px;
   color: #003366;
@@ -660,6 +933,149 @@ export default {
   background: transparent;
   border-color: #2b3e75;
   color: black;
+}
+
+/* Calendar Modal */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  max-width: 90%;
+  max-height: 90vh;
+  overflow: auto;
+}
+
+.calendar-modal {
+  width: 600px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 25px;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.modal-header h2 {
+  margin: 0;
+  font-size: 24px;
+  color: #333;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 24px;
+  color: #666;
+  cursor: pointer;
+  padding: 5px 10px;
+  transition: color0.3s;
+}
+
+.close-btn:hover {
+  color: #333;
+}
+
+.modal-body {
+  padding: 25px;
+}
+
+.calendar-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.calendar-controls h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  font-weight: 600;
+}
+
+.nav-btn {
+  background: #f5f5f5;
+  border: none;
+  width: 35px;
+  height: 35px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #333;
+  transition: all 0.3s;
+}
+
+.nav-btn:hover {
+  background: #e0e0e0;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+
+.calendar-day-header {
+  text-align: center;
+  font-weight: 600;
+  color: #666;
+  padding: 10px;
+  font-size: 14px;
+}
+
+.calendar-date {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s;
+  color: #333;
+}
+
+.calendar-date:hover:not(.other-month) {
+  background: #f0f0f0;
+}
+
+.calendar-date.other-month {
+  color: #ccc;
+  cursor: default;
+}
+
+.calendar-date.today {
+  background: #e3f2fd;
+  color: #1976d2;
+  font-weight: 600;
+}
+
+.calendar-date.selected {
+  background: #2b3e75;
+  color: white;
+  font-weight: 600;
+}
+
+.calendar-date.selected:hover {
+  background: #1e2f5a;
 }
 
 .stats-grid {
@@ -838,9 +1254,18 @@ export default {
 }
 
 .data-table th {
-  background: #f5f7fa;
+  background: #2b3e75;
   font-weight: 600;
-  color: #333;
+  color: white;
+  padding: 10px;
+}
+
+.data-table th:first-child {
+  border-top-left-radius: 8px;
+}
+
+.data-table th:last-child {
+  border-top-right-radius: 8px;
 }
 
 .data-table tr:hover {
@@ -851,6 +1276,180 @@ export default {
   text-align: center;
   padding: 40px;
   color: #999;
+}
+
+/* Recent Activity Section */
+.recent-activity-section {
+  margin-top: 40px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 25px;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.activity-header h2 {
+  color: #003366;
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.activity-controls {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.search-box {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.search-input {
+  padding: 8px 35px 8px 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-size: 14px;
+  width: 250px;
+  transition: border-color 0.3s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #2b3e75;
+}
+
+.search-icon {
+  position: absolute;
+  right: 12px;
+  color: #999;
+  pointer-events: none;
+}
+
+.filter-btn {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #e0e0e0;
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #666;
+  transition: all 0.3s;
+}
+
+.filter-btn:hover {
+  background: #f5f5f5;
+  border-color: #d0d0d0;
+}
+
+.date-filter-badge {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 15px;
+  background: #e3f2fd;
+  border-radius: 6px;
+  margin-bottom: 15px;
+  color: #1976d2;
+  font-size: 14px;
+}
+
+.clear-filter {
+  background: none;
+  border: none;
+  color: #1976d2;
+  cursor: pointer;
+  padding: 2px 5px;
+  font-size: 14px;
+  transition: color 0.3s;
+}
+
+.clear-filter:hover {
+  color: #0d47a1;
+}
+
+.activity-table-container {
+  overflow-x: auto;
+}
+
+.activity-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.activity-table thead {
+  background: #003d7a;
+  color: white;
+}
+
+.activity-table th {
+  padding: 15px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+.activity-table td {
+  padding: 15px;
+  border-bottom: 1px solid #f0f0f0;
+  font-size: 14px;
+}
+
+.activity-table tbody tr:hover {
+  background: #f9f9f9;
+}
+
+.activity-badge {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-badge {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.status-badge.completed {
+  background: #e8f5e9;
+  color: #4caf50;
+}
+
+.status-badge.pending {
+  background: #fff3e0;
+  color: #ff9800;
+}
+
+.status-badge.failed {
+  background: #ffebee;
+  color: #f44336;
+}
+
+.no-activity {
+  text-align: center;
+  padding: 60px 20px;
+  color: #999;
+  font-size: 16px;
 }
 
 @media (max-width: 768px) {
@@ -884,6 +1483,15 @@ export default {
 
   .hr-form .form-row {
     grid-template-columns: 1fr;
+  }
+
+  .activity-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-input {
+    width: 100%;
   }
 }
 </style>
