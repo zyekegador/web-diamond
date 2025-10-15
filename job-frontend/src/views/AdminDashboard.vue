@@ -5,7 +5,7 @@
       <div class="header-left">
         <img src="@/assets/butuanon.png" alt="Logo" class="logo" />
         <div class="header-title">
-          <h1>DASHBOARD</h1>
+          <h1>ADMIN PANEL</h1>
         </div>
       </div>
 
@@ -51,171 +51,178 @@
 
     <!--Dashboard-->
 
-    <div class="dashboard-container">
-      <aside class="sidebar">
-        <ul class="sidebar-menu">
+    <div class="dashboard">
+      <!-- NAV BAR UNDER HEADER -->
+      <nav class="sub-header-nav">
+        <ul class="sub-nav-menu">
           <li
             :class="{ active: activeTab === 'overview' }"
             @click="activeTab = 'overview'"
           >
-            <font-awesome-icon :icon="['fas', 'chart-line']" />
             <span>Overview</span>
           </li>
           <li
             :class="{ active: activeTab === 'create-hr' }"
             @click="activeTab = 'create-hr'"
           >
-            <font-awesome-icon :icon="['fas', 'user-plus']" />
             <span>Create HR Account</span>
           </li>
           <li
             :class="{ active: activeTab === 'hr-list' }"
             @click="activeTab = 'hr-list'"
           >
-            <font-awesome-icon :icon="['fas', 'users']" />
             <span>HR Staff List</span>
           </li>
         </ul>
-      </aside>
 
-      <main class="main-content">
-        <!-- Overview Tab -->
-        <div v-if="activeTab === 'overview'" class="content-section">
-          <h1>System Overview</h1>
-          <div class="stats-grid">
-            <div class="stat-card">
+        <!-- Right-side button 
+        <button class="new-btn">NEW +</button> -->
+      </nav>
+    </div>
+
+    <main class="main-content">
+      <!-- Overview Tab -->
+      <div v-if="activeTab === 'overview'" class="content-section">
+        <div class="overview-header">
+          <h1>SYSTEM OVERVIEW</h1>
+          <button class="calendar-btn" @click="openCalendar">
+            <font-awesome-icon :icon="['far', 'calendar']" />
+            Calendar
+          </button>
+        </div>
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-header blue-header">Total HR Staff</div>
+            <div class="stat-body">
               <div class="stat-icon blue">
                 <font-awesome-icon :icon="['fas', 'users']" />
               </div>
-              <div class="stat-info">
-                <h3>Total HR Staff</h3>
-                <p class="stat-number">{{ stats.hrCount }}</p>
-              </div>
+              <p class="stat-number">{{ stats.hrCount }}</p>
             </div>
+          </div>
 
-            <div class="stat-card">
+          <div class="stat-card">
+            <div class="stat-header green-header">Total Applicants</div>
+            <div class="stat-body">
               <div class="stat-icon green">
                 <font-awesome-icon :icon="['fas', 'user-check']" />
               </div>
-              <div class="stat-info">
-                <h3>Total Applicants</h3>
-                <p class="stat-number">{{ stats.applicantCount }}</p>
-              </div>
+              <p class="stat-number">{{ stats.applicantCount }}</p>
             </div>
+          </div>
 
-            <div class="stat-card">
+          <div class="stat-card">
+            <div class="stat-header orange-header">Active Job</div>
+            <div class="stat-body">
               <div class="stat-icon orange">
                 <font-awesome-icon :icon="['fas', 'briefcase']" />
               </div>
-              <div class="stat-info">
-                <h3>Active Jobs</h3>
-                <p class="stat-number">{{ stats.jobCount }}</p>
-              </div>
+              <p class="stat-number">{{ stats.jobCount }}</p>
             </div>
+          </div>
 
-            <div class="stat-card">
+          <div class="stat-card">
+            <div class="stat-header purple-header">Total Applications</div>
+            <div class="stat-body">
               <div class="stat-icon purple">
                 <font-awesome-icon :icon="['fas', 'file-alt']" />
               </div>
-              <div class="stat-info">
-                <h3>Total Applications</h3>
-                <p class="stat-number">{{ stats.applicationCount }}</p>
-              </div>
+              <p class="stat-number">{{ stats.applicationCount }}</p>
             </div>
           </div>
         </div>
+      </div>
 
-        <!-- Create HR Tab -->
-        <div v-if="activeTab === 'create-hr'" class="content-section">
-          <h1>Create HR Account</h1>
-          <div class="form-container">
-            <form @submit.prevent="createHR" class="hr-form">
-              <div class="form-row">
-                <div class="form-group">
-                  <label>First Name *</label>
-                  <input type="text" v-model="hrForm.first_name" required />
-                </div>
-                <div class="form-group">
-                  <label>Last Name *</label>
-                  <input type="text" v-model="hrForm.last_name" required />
-                </div>
-              </div>
-
+      <!-- Create HR Tab -->
+      <div v-if="activeTab === 'create-hr'" class="content-section">
+        <h1>CREATE HR ACCOUNT</h1>
+        <div class="form-container">
+          <form @submit.prevent="createHR" class="hr-form">
+            <div class="form-row">
               <div class="form-group">
-                <label>Username *</label>
-                <input type="text" v-model="hrForm.username" required />
+                <label>First Name *</label>
+                <input type="text" v-model="hrForm.first_name" required />
               </div>
-
               <div class="form-group">
-                <label>Email *</label>
-                <input type="email" v-model="hrForm.email" required />
+                <label>Last Name *</label>
+                <input type="text" v-model="hrForm.last_name" required />
               </div>
-
-              <div class="form-group">
-                <label>Employee ID</label>
-                <input type="text" v-model="hrForm.employee_id" />
-              </div>
-
-              <div class="form-group">
-                <label>Department</label>
-                <input type="text" v-model="hrForm.department" />
-              </div>
-
-              <div class="form-group">
-                <label>Phone Number</label>
-                <input type="tel" v-model="hrForm.phone_number" />
-              </div>
-
-              <div class="form-group">
-                <label>Password *</label>
-                <input type="password" v-model="hrForm.password" required />
-              </div>
-
-              <div v-if="error" class="error-message">{{ error }}</div>
-              <div v-if="success" class="success-message">{{ success }}</div>
-
-              <button type="submit" class="btn-primary" :disabled="loading">
-                {{ loading ? "Creating..." : "Create HR Account" }}
-              </button>
-            </form>
-          </div>
-        </div>
-
-        <!-- HR List Tab -->
-        <div v-if="activeTab === 'hr-list'" class="content-section">
-          <h1>HR Staff List</h1>
-          <div class="table-container">
-            <table class="data-table">
-              <thead>
-                <tr>
-                  <th>Employee ID</th>
-                  <th>Name</th>
-                  <th>Username</th>
-                  <th>Email</th>
-                  <th>Department</th>
-                  <th>Phone</th>
-                  <th>Date Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="hr in hrList" :key="hr.id">
-                  <td>{{ hr.employee_id || "N/A" }}</td>
-                  <td>{{ hr.first_name }} {{ hr.last_name }}</td>
-                  <td>{{ hr.username }}</td>
-                  <td>{{ hr.email }}</td>
-                  <td>{{ hr.department || "N/A" }}</td>
-                  <td>{{ hr.phone_number || "N/A" }}</td>
-                  <td>{{ formatDate(hr.created_at) }}</td>
-                </tr>
-              </tbody>
-            </table>
-            <div v-if="hrList.length === 0" class="no-data">
-              No HR staff found
             </div>
+
+            <div class="form-group">
+              <label>Username *</label>
+              <input type="text" v-model="hrForm.username" required />
+            </div>
+
+            <div class="form-group">
+              <label>Email *</label>
+              <input type="email" v-model="hrForm.email" required />
+            </div>
+
+            <div class="form-group">
+              <label>Employee ID</label>
+              <input type="text" v-model="hrForm.employee_id" />
+            </div>
+
+            <div class="form-group">
+              <label>Department</label>
+              <input type="text" v-model="hrForm.department" />
+            </div>
+
+            <div class="form-group">
+              <label>Phone Number</label>
+              <input type="tel" v-model="hrForm.phone_number" />
+            </div>
+
+            <div class="form-group">
+              <label>Password *</label>
+              <input type="password" v-model="hrForm.password" required />
+            </div>
+
+            <div v-if="error" class="error-message">{{ error }}</div>
+            <div v-if="success" class="success-message">{{ success }}</div>
+
+            <button type="submit" class="btn-primary" :disabled="loading">
+              {{ loading ? "Creating..." : "Create HR Account" }}
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- HR List Tab -->
+      <div v-if="activeTab === 'hr-list'" class="content-section">
+        <h1>HR STAFF LIST</h1>
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Employee ID</th>
+                <th>Name</th>
+                <th>Username</th>
+                <th>Email</th>
+                <th>Department</th>
+                <th>Phone</th>
+                <th>Date Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="hr in hrList" :key="hr.id">
+                <td>{{ hr.employee_id || "N/A" }}</td>
+                <td>{{ hr.first_name }} {{ hr.last_name }}</td>
+                <td>{{ hr.username }}</td>
+                <td>{{ hr.email }}</td>
+                <td>{{ hr.department || "N/A" }}</td>
+                <td>{{ hr.phone_number || "N/A" }}</td>
+                <td>{{ formatDate(hr.created_at) }}</td>
+              </tr>
+            </tbody>
+          </table>
+          <div v-if="hrList.length === 0" class="no-data">
+            No HR staff found
           </div>
         </div>
-      </main>
-    </div>
+      </div>
+    </main>
   </div>
 </template>
 
@@ -335,11 +342,6 @@ export default {
 </script>
 
 <style scoped>
-.hr-dashboard {
-  min-height: 100vh;
-}
-
-/* Header */
 .top-header {
   background: #2b3e75;
   display: flex;
@@ -544,108 +546,200 @@ export default {
 .btn-logout:hover {
   background: #d32f2f;
 }
-
 .dashboard-container {
   display: flex;
   min-height: calc(100vh - 70px);
 }
 
 .sidebar {
-  width: 250px;
-  background: white;
-  box-shadow: 2px 0 5px rgba(0, 0, 0, 0.1);
+  width: 220px;
+  background-color: #2f3e6e;
+  color: white;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0;
 }
 
-.sidebar-menu {
-  list-style: none;
-  padding: 20px 0;
+.sub-header-nav {
+  background-color: #3b4d7a;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  padding-left: 30px;
+  padding-right: 30px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 60px;
 }
 
-.sidebar-menu li {
-  padding: 15px 25px;
-  cursor: pointer;
+.sub-nav-menu {
   display: flex;
   align-items: center;
-  gap: 15px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  gap: 40px;
+}
+
+.sub-nav-menu li {
+  position: relative;
+  cursor: pointer;
+  color: #dce3f2;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  font-size: 15px;
+}
+
+.sub-nav-menu li:hover {
+  color: #ffffff;
+}
+
+.sub-nav-menu li.active {
+  color: #ffffff;
+  border-bottom: 3px solid #b4c8ff;
+  padding-bottom: 3px;
+}
+
+/* NEW button below the menu 
+.new-btn {
+  background-color: #5d74c7;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-left: auto;
+}
+
+.new-btn:hover {
+  background-color: #4a61b5;
+  transform: translateY(-1px);
+}
+  */
+
+/* Main Content */
+.main-content {
+  flex: 1;
+  background-color: #fff;
+  padding: 40px;
+  overflow-y: auto;
+}
+.content-section h1 {
+  margin-bottom: 30px;
+  color: #003366;
+  font-weight: 750;
+  font-size: 25px;
+  letter-spacing: 0.5px;
+}
+
+.overview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.calendar-btn {
+  background: #2b3e75;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 10px 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: white;
   transition: all 0.3s;
 }
 
-.sidebar-menu li:hover {
-  background: #f5f7fa;
-}
-
-.sidebar-menu li.active {
-  background: #4caf50;
-  color: white;
-  border-right: 4px solid #45a049;
-}
-
-.sidebar-menu li svg {
-  font-size: 18px;
-  width: 20px;
-}
-
-.main-content {
-  flex: 1;
-  padding: 30px;
-}
-
-.content-section h1 {
-  margin-bottom: 30px;
-  color: #333;
+.calendar-btn:hover {
+  background: transparent;
+  border-color: #2b3e75;
+  color: black;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
   margin-top: 20px;
 }
 
 .stat-card {
   background: white;
-  padding: 25px;
-  border-radius: 10px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-header {
+  padding: 12px 20px;
+  color: white;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+}
+
+.stat-header.blue-header {
+  background: #003d7a;
+}
+
+.stat-header.green-header {
+  background: #4caf50;
+}
+
+.stat-header.orange-header {
+  background: #ff9800;
+}
+
+.stat-header.purple-header {
+  background: #7b1fa2;
+}
+
+.stat-body {
+  padding: 30px 20px;
   display: flex;
   align-items: center;
   gap: 20px;
+  background: white;
 }
 
 .stat-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 12px;
+  width: 50px;
+  height: 50px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 24px;
   color: white;
+  flex-shrink: 0;
 }
 
 .stat-icon.blue {
   background: #2196f3;
 }
 .stat-icon.green {
-  background: #4caf50;
+  background: #66bb6a;
 }
 .stat-icon.orange {
-  background: #ff9800;
+  background: #ffa726;
 }
 .stat-icon.purple {
-  background: #9c27b0;
-}
-
-.stat-info h3 {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 5px;
+  background: #ab47bc;
 }
 
 .stat-number {
-  font-size: 32px;
+  font-size: 48px;
   font-weight: 700;
-  color: #333;
+  color: #003366;
+  margin: 0;
 }
 
 .form-container {
@@ -766,6 +860,13 @@ export default {
 
   .sidebar {
     width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #354775;
+    padding: 0 30px;
+    height: 50px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
   }
 
   .sidebar-menu {
