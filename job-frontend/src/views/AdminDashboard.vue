@@ -3,9 +3,8 @@
     <!-- Top Header -->
     <header class="top-header">
       <div class="header-left">
-        <img src="@/assets/butuanon.png" alt="Logo" class="logo" />
         <div class="header-title">
-          <h1>ADMIN PANEL</h1>
+          <h1>ADMIN DASHBOARD</h1>
         </div>
       </div>
 
@@ -643,11 +642,7 @@ export default {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 20px;
-}
-
-.header-left .logo {
-  height: 75px;
+  gap: 30px;
 }
 
 .header-title h1 {
@@ -655,6 +650,7 @@ export default {
   font-size: 24px;
   font-weight: 700;
   letter-spacing: 1px;
+  padding-left: 30px;
 }
 
 .header-right {
@@ -842,21 +838,10 @@ export default {
   min-height: calc(100vh - 70px);
 }
 
-.sidebar {
-  width: 220px;
-  background-color: #2f3e6e;
-  color: white;
-  display: flex;
-  flex-direction: column;
-  padding: 20px;
-  box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
-  flex-shrink: 0;
-}
-
 .sub-header-nav {
-  background-color: #3b4d7a;
+  background-color: whitesmoke;
   display: flex;
-  justify-content: flex-start;
+  justify-content: center;
   align-items: center;
   padding-left: 30px;
   padding-right: 30px;
@@ -872,27 +857,32 @@ export default {
   margin: 0;
   gap: 40px;
 }
-
 .sub-nav-menu li {
   position: relative;
   cursor: pointer;
-  color: #dce3f2;
+  color: #333;
   font-weight: 500;
   transition: all 0.3s ease;
   font-size: 15px;
+  text-align: center;
+  padding: 10px 18px;
+  border-radius: 6px;
 }
 
 .sub-nav-menu li:hover {
-  color: #ffffff;
+  background-color: #4caf79;
+  color: white;
+  transform: scale(1.05);
+  box-shadow: 0 4px 10px rgba(76, 175, 121, 0.3);
 }
 
 .sub-nav-menu li.active {
-  color: #ffffff;
-  border-bottom: 3px solid #b4c8ff;
-  padding-bottom: 3px;
+  background-color: #4caf79;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 10px rgba(76, 175, 121, 0.3);
 }
 
-/* Main Content */
 .main-content {
   flex: 1;
   background-color: #fff;
